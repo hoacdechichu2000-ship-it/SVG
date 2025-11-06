@@ -14,7 +14,7 @@ int WINAPI wWinMain(
 
     AppWindow window;
 
-    HWND hwnd = window.Create(L"SVG Viewer - Dự Án Của Tôi", hInstance);
+    HWND hwnd = window.Create(L"SVG Viewer", hInstance);
 
     if (hwnd == NULL)
     {
@@ -32,4 +32,5 @@ int WINAPI wWinMain(
     }
 
     return (int)msg.wParam;
+
 }
