@@ -1,5 +1,8 @@
 #include "AppWindow.h"
 #include <stdexcept>
+#include <gdiplus.h> 
+
+using namespace Gdiplus;
 
 const wchar_t AppWindow::CLASS_NAME[] = L"SVGAppWindow";
 
@@ -18,6 +21,8 @@ BOOL AppWindow::RegisterWindowClass(HINSTANCE hInstance)
 
 HWND AppWindow::Create(LPCWSTR lpWindowName, HINSTANCE hInstance)
 {
+    GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
+    
     m_hwnd = CreateWindowExW(
         0,                                  
         CLASS_NAME,                          
@@ -33,7 +38,13 @@ HWND AppWindow::Create(LPCWSTR lpWindowName, HINSTANCE hInstance)
     
     if (m_hwnd == NULL)
     {
+        GdiplusShutdown(m_gdiplusToken);
         return NULL;
+    }
+
+    try {
+        m_parser.parserFile("SvgParser/sample.svg");
+    } catch (const std::exception& e) {
     }
 
     return m_hwnd;
@@ -68,6 +79,7 @@ LRESULT AppWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
     case WM_DESTROY:
+        GdiplusShutdown(m_gdiplusToken);
         PostQuitMessage(0);
         return 0;
 
@@ -87,7 +99,8 @@ LRESULT AppWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void AppWindow::OnPaint(HDC hdc)
 {
-    RECT rc;
-    GetClientRect(m_hwnd, &rc);
-    DrawTextW(hdc, L"Chào mừng đến với SVG Viewer!", -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    Graphics graphics(hdc);
+    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+
+    m_renderer.renderAll(graphics, m_parser.getShapes());
 }
