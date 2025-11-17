@@ -2,7 +2,7 @@
 
 #include <windows.h>
 #include <gdiplus.h> 
-#include "SvgParser/SvgParser.h"
+#include "SvgParser.h"
 #include "Renderer.h" 
 
 class AppWindow
@@ -29,3 +29,4 @@ private:
 
     void OnPaint(HDC hdc);
 };
+
