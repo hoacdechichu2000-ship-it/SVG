@@ -43,7 +43,7 @@ HWND AppWindow::Create(LPCWSTR lpWindowName, HINSTANCE hInstance)
     }
 
     try {
-        m_parser.parserFile("SvgParser/sample.svg");
+        m_parser.parserFile("sample.svg");
     } catch (const std::exception& e) {
     }
 
