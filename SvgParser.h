@@ -5,16 +5,14 @@
 #include <vector>
 #include <string>
 
-using namespace std;
-
 struct Style {
-    string fill, stroke;
+    std::string fill, stroke;
     double fillOpacity, strokeOpacity, strokeWidth;
 };
 
 class SVGParser {
 private:
-    vector<Shape*> shapes; // lưu tất cả Shape
+    std::vector<SVG::Shape*> shapes;    // lưu tất cả Shape
 
 public:
     // Constructor & Destructor
@@ -22,30 +20,30 @@ public:
     ~SVGParser();
 
     // Lấy các thông số string, int, double
-    string getAttrString(const string& line, const string& attr) const;
-    int getAttrInt(const string& line, const string& attr, int defaultValue) const;
-    double getAttrDouble(const string& line, const string& attr, double defaultValue) const;
+    std::string getAttrString(const std::string& line, const std::string& attr) const;
+    int getAttrInt(const std::string& line, const std::string& attr, int defaultValue) const;
+    double getAttrDouble(const std::string& line, const std::string& attr, double defaultValue) const;
 
     // Lấy thuộc tính points
-    vector<pair<int,int>> getPoints(const string& pointsStr) const;
+    std::vector<std::pair<int,int>> getPoints(const std::string& pointsStr) const;
 
     // Lấy các thuộc tính màu sắc
-    Style getStyle(const string& line) const;
+    Style getStyle(const std::string& line) const;
 
     // Đọc file SVG
-    void parserFile(const string& filename);
+    void parserFile(const std::string& filename);
 
     // Parse từng loại Shape
-    void parserRect(const string& line);
-    void parserCircle(const string& line);
-    void parserEllipse(const string& line);
-    void parserText(const string& line);
-    void parserLine(const string& line);
-    void parserPolyline(const string& line);
-    void parserPolygon(const string& line);
+    void parserRect(const std::string& line);
+    void parserCircle(const std::string& line);
+    void parserEllipse(const std::string& line);
+    void parserText(const std::string& line);
+    void parserLine(const std::string& line);
+    void parserPolyline(const std::string& line);
+    void parserPolygon(const std::string& line);
 
     // Getter
-    const vector<Shape*>& getShapes() const { return shapes; }
+    const std::vector<SVG::Shape*>& getShapes() const { return shapes; }
 };
 
 #endif
