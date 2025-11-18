@@ -1,30 +1,27 @@
-#pragma once
+#ifndef RENDERER_H
+#define RENDERER_H
 
-#include <gdiplus.h>
-#include <vector>
 #include "Shape.h"
+#include <vector>
 
-class Renderer
-{
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <windows.h>
+#include <gdiplus.h>
+#undef Polygon 
+
+using namespace Gdiplus;
+
+class Renderer {
 public:
     Renderer() = default;
+    ~Renderer() = default;
 
-    // Hàm vẽ toàn bộ danh sách Shape
-    void renderAll(Gdiplus::Graphics& g, const std::vector<Shape*>& shapes);
-
-private:
-    void drawShape(Gdiplus::Graphics& g, Shape* shape);
-
-    // Hàm vẽ từng loại hình
-    void drawLine(Gdiplus::Graphics& g, Line* line);
-    void drawRect(Gdiplus::Graphics& g, Rect* rect);
-    void drawCircle(Gdiplus::Graphics& g, Circle* circle);
-    void drawEllipse(Gdiplus::Graphics& g, Ellipse* ellipse);
-    void drawPolyline(Gdiplus::Graphics& g, Polyline* pl);
-    void drawPolygon(Gdiplus::Graphics& g, Polygon* pg);
-    void drawText(Gdiplus::Graphics& g, Text* text);
-
-    // Helper
-    Gdiplus::Color parseColor(const std::string& color, double opacity);
+    void drawShape(Graphics& g, const SVG::Shape* shape) const;
+    
+    void renderAll(Graphics& g, const std::vector<SVG::Shape*>& shapes) const;
 };
 
+#endif // RENDERER_H
