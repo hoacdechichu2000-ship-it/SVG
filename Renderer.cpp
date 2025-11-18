@@ -1,258 +1,140 @@
 #include "Renderer.h"
-#include <gdiplus.h>
-#include <string>
+#include <sstream>
+#include <stdio.h> 
+#include <algorithm> 
 
-using namespace Gdiplus;
-using namespace std;
+using namespace std; 
+using namespace SVG;
 
-// =====================
-// Convert màu từ string
-// =====================
-Color Renderer::parseColor(const string& color, double opacity)
-{
-    int a = (int)(opacity * 255);
+wstring s2ws(const string& str) {
+    if (str.empty()) return wstring();
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), NULL, 0);
+    wstring wstrTo(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), &wstrTo[0], size_needed);
+    return wstrTo;
+}
 
-    if (color == "none")
-        return Color(0, 0, 0, 0);
 
-    if (color == "black") return Color(a, 0, 0, 0);
-    if (color == "red") return Color(a, 255, 0, 0);
-    if (color == "green") return Color(a, 0, 255, 0);
-    if (color == "blue") return Color(a, 0, 0, 255);
+Color parseColor(const string& colorStr, double opacity = 1.0) {
+    if (colorStr == "none" || colorStr.empty()) return Color(0, 0, 0, 0); 
+    
+    int r = 0, g = 0, b = 0; 
 
-    // format #RRGGBB
-    if (color[0] == '#' && color.size() == 7)
-    {
-        int r = stoi(color.substr(1, 2), nullptr, 16);
-        int g = stoi(color.substr(3, 2), nullptr, 16);
-        int b = stoi(color.substr(5, 2), nullptr, 16);
-        return Color(a, r, g, b);
+    if (colorStr[0] == '#') {
+        const char* hex = colorStr.c_str() + 1;
+        #ifdef _MSC_VER
+        sscanf_s(hex, "%02x%02x%02x", &r, &g, &b);
+        #else
+        sscanf(hex, "%02x%02x%02x", &r, &g, &b);
+        #endif
+    } 
+    else if (colorStr.size() >= 4 && colorStr.substr(0, 4) == "rgb(") {
+        string temp = colorStr.substr(4); 
+        size_t end = temp.find(')');
+        if (end != string::npos) temp = temp.substr(0, end); 
+
+        std::replace(temp.begin(), temp.end(), ',', ' ');
+
+        istringstream ss(temp);
+        ss >> r >> g >> b;
     }
 
-    return Color(a, 0, 0, 0); // default black
+    if (r < 0) r = 0; else if (r > 255) r = 255;
+    if (g < 0) g = 0; else if (g > 255) g = 255;
+    if (b < 0) b = 0; else if (b > 255) b = 255;
+    
+    BYTE alpha = (BYTE)(opacity * 255.0);
+    return Color(alpha, (BYTE)r, (BYTE)g, (BYTE)b);
 }
 
-// =====================
-// renderAll
-// =====================
-void Renderer::renderAll(Graphics& g, const vector<Shape*>& shapes)
-{
-    for (Shape* s : shapes)
-        drawShape(g, s);
-}
+void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
+    if (!shape) return;
 
-// =====================
-// Phân loại shape
-// =====================
-void Renderer::drawShape(Graphics& g, Shape* shape)
-{
-    if (auto p = dynamic_cast<Line*>(shape)) return drawLine(g, p);
-    if (auto p = dynamic_cast<Rect*>(shape)) return drawRect(g, p);
-    if (auto p = dynamic_cast<Circle*>(shape)) return drawCircle(g, p);
-    if (auto p = dynamic_cast<Ellipse*>(shape)) return drawEllipse(g, p);
-    if (auto p = dynamic_cast<Polyline*>(shape)) return drawPolyline(g, p);
-    if (auto p = dynamic_cast<Polygon*>(shape)) return drawPolygon(g, p);
-    if (auto p = dynamic_cast<Text*>(shape)) return drawText(g, p);
-}
+    Pen pen(parseColor(shape->getStroke(), shape->getStrokeOpacity()), (REAL)shape->getStrokeWidth());
 
-// =====================
-// Vẽ Line
-// =====================
-void Renderer::drawLine(Graphics& g, Line* line)
-{
-    Pen pen(
-        parseColor(line->getStroke(), line->getStrokeOpacity()),
-        (REAL)line->getStrokeWidth()
-    );
-
-    g.DrawLine(
-        &pen,
-        line->getX1(), line->getY1(),
-        line->getX2(), line->getY2()
-    );
-}
-
-// =====================
-// Vẽ Rect
-// =====================
-void Renderer::drawRect(Graphics& g, Rect* rect)
-{
-    Pen pen(
-        parseColor(rect->getStroke(), rect->getStrokeOpacity()),
-        (REAL)rect->getStrokeWidth()
-    );
-
-    Brush* brush = nullptr;
-    if (rect->getFill() != "none")
-        brush = new SolidBrush(parseColor(rect->getFill(), rect->getFillOpacity()));
-
-    if (brush)
-    {
-        g.FillRectangle(
-            brush,
-            rect->getX(),
-            rect->getY(),
-            rect->getWidth(),
-            rect->getHeight()
-        );
-        delete brush;
+    const SVG::Line* l = dynamic_cast<const SVG::Line*>(shape);
+    if (l) {
+        g.DrawLine(&pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+        return;
     }
 
-    g.DrawRectangle(
-        &pen,
-        rect->getX(),
-        rect->getY(),
-        rect->getWidth(),
-        rect->getHeight()
-    );
-}
+    const SVG::FilledShape* filledShape = dynamic_cast<const SVG::FilledShape*>(shape);
+    if (!filledShape) {
+        return; 
+    }
+    
+    SolidBrush brush(parseColor(filledShape->getFill(), filledShape->getFillOpacity()));
 
-// =====================
-// Vẽ Circle
-// =====================
-void Renderer::drawCircle(Graphics& g, Circle* circle)
-{
-    int d = circle->getR() * 2;
-
-    Pen pen(
-        parseColor(circle->getStroke(), circle->getStrokeOpacity()),
-        (REAL)circle->getStrokeWidth()
-    );
-
-    Brush* brush = nullptr;
-    if (circle->getFill() != "none")
-        brush = new SolidBrush(parseColor(circle->getFill(), circle->getFillOpacity()));
-
-    if (brush)
-    {
-        g.FillEllipse(
-            brush,
-            circle->getCX() - circle->getR(),
-            circle->getCY() - circle->getR(),
-            d, d
-        );
-        delete brush;
+    const SVG::Rect* r = dynamic_cast<const SVG::Rect*>(filledShape);
+    if (r) {
+        g.FillRectangle(&brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        g.DrawRectangle(&pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        return;
     }
 
-    g.DrawEllipse(
-        &pen,
-        circle->getCX() - circle->getR(),
-        circle->getCY() - circle->getR(),
-        d, d
-    );
-}
-
-// =====================
-// Vẽ Ellipse
-// =====================
-void Renderer::drawEllipse(Graphics& g, Ellipse* e)
-{
-    Pen pen(
-        parseColor(e->getStroke(), e->getStrokeOpacity()),
-        (REAL)e->getStrokeWidth()
-    );
-
-    Brush* brush = nullptr;
-    if (e->getFill() != "none")
-        brush = new SolidBrush(parseColor(e->getFill(), e->getFillOpacity()));
-
-    int w = e->getRX() * 2;
-    int h = e->getRY() * 2;
-
-    if (brush)
-    {
-        g.FillEllipse(
-            brush,
-            e->getCX() - e->getRX(),
-            e->getCY() - e->getRY(),
-            w, h
-        );
-        delete brush;
+    const SVG::Circle* c = dynamic_cast<const SVG::Circle*>(filledShape);
+    if (c) {
+        int x = c->getCX() - c->getR();
+        int y = c->getCY() - c->getR();
+        int width = c->getR() * 2;
+        int height = c->getR() * 2;
+        g.FillEllipse(&brush, x, y, width, height);
+        g.DrawEllipse(&pen, x, y, width, height);
+        return;
     }
 
-    g.DrawEllipse(
-        &pen,
-        e->getCX() - e->getRX(),
-        e->getCY() - e->getRY(),
-        w, h
-    );
-}
-
-// =====================
-// Vẽ Polyline
-// =====================
-void Renderer::drawPolyline(Graphics& g, Polyline* pl)
-{
-    const auto& pts = pl->getPoints();
-    if (pts.size() < 2) return;
-
-    Pen pen(
-        parseColor(pl->getStroke(), pl->getStrokeOpacity()),
-        (REAL)pl->getStrokeWidth()
-    );
-
-    vector<Point> gdiPts;
-    for (auto& p : pts)
-        gdiPts.push_back(Point(p.first, p.second));
-
-    g.DrawLines(&pen, gdiPts.data(), gdiPts.size());
-}
-
-// =====================
-// Vẽ Polygon
-// =====================
-void Renderer::drawPolygon(Graphics& g, Polygon* pg)
-{
-    const auto& pts = pg->getPoints();
-    if (pts.size() < 3) return;
-
-    vector<Point> gdiPts;
-    for (auto& p : pts)
-        gdiPts.push_back(Point(p.first, p.second));
-
-    Brush* brush = nullptr;
-    if (pg->getFill() != "none")
-        brush = new SolidBrush(parseColor(pg->getFill(), pg->getFillOpacity()));
-
-    if (brush)
-    {
-        g.FillPolygon(
-            brush,
-            gdiPts.data(),
-            gdiPts.size()
-        );
-        delete brush;
+    const SVG::Ellipse* e = dynamic_cast<const SVG::Ellipse*>(filledShape);
+    if (e) {
+        int x = e->getCX() - e->getRX();
+        int y = e->getCY() - e->getRY();
+        int width = e->getRX() * 2;
+        int height = e->getRY() * 2;
+        g.FillEllipse(&brush, x, y, width, height);
+        g.DrawEllipse(&pen, x, y, width, height);
+        return;
     }
 
-    Pen pen(
-        parseColor(pg->getStroke(), pg->getStrokeOpacity()),
-        (REAL)pg->getStrokeWidth()
-    );
+    const SVG::Polyline* pl = dynamic_cast<const SVG::Polyline*>(filledShape);
+    if (pl) {
+        vector<PointF> pts;
+        for (const auto& p : pl->getPoints()) {
+            pts.push_back(PointF((REAL)p.first, (REAL)p.second));
+        }
+        if (pts.size() > 1) { 
+            g.DrawLines(&pen, &pts[0], (int)pts.size());
+        }
+        return;
+    }
 
-    g.DrawPolygon(
-        &pen,
-        gdiPts.data(),
-        gdiPts.size()
-    );
+    const SVG::Polygon* pg = dynamic_cast<const SVG::Polygon*>(filledShape);
+    if (pg) {
+        vector<PointF> pts;
+        for (const auto& p : pg->getPoints()) {
+            pts.push_back(PointF((REAL)p.first, (REAL)p.second));
+        }
+        if (pts.size() > 2) {
+            g.FillPolygon(&brush, &pts[0], (int)pts.size());
+            g.DrawPolygon(&pen, &pts[0], (int)pts.size());
+        }
+        return;
+    }
+
+    const SVG::Text* t = dynamic_cast<const SVG::Text*>(filledShape);
+    if (t) {
+        FontFamily fontFamily(L"Arial");
+        Font font(&fontFamily, (REAL)t->getFontSize(), FontStyleRegular, UnitPixel);
+        
+        wstring ws = s2ws(t->getContent());
+        
+        REAL adjustedY = (REAL)t->getY() - (REAL)t->getFontSize();
+        
+        g.DrawString(ws.c_str(), -1, &font, PointF((REAL)t->getX(), adjustedY), &brush);
+        return;
+    }
 }
 
-// =====================
-// Vẽ Text
-// =====================
-void Renderer::drawText(Graphics& g, Text* text)
-{
-    SolidBrush brush(parseColor(text->getFill(), text->getFillOpacity()));
-
-    Font font(L"Arial", (REAL)text->getFontSize(), FontStyleRegular);
-
-    std::wstring ws(text->getContent().begin(), text->getContent().end());
-
-    g.DrawString(
-        ws.c_str(),
-        -1,
-        &font,
-        PointF((REAL)text->getX(), (REAL)text->getY()),
-        &brush
-    );
+void Renderer::renderAll(Graphics& g, const vector<SVG::Shape*>& shapes) const {
+    for (const SVG::Shape* shape : shapes) {
+        drawShape(g, shape);
+    }
 }
-
