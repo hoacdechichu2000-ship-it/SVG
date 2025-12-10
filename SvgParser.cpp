@@ -1,4 +1,4 @@
-#include "SVGParser.h"
+#include "SvgParser.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -65,43 +65,106 @@ vector<pair<int,int>> SVGParser::getPoints(const string& pointsStr) const {
 }
 
 // Lấy các thuộc tính màu sắc
-Style SVGParser::getStyle(const string& line) const {
+SVG::Style SVGParser::parserStyle(const string& line) const {
     Style style;
 
-    style.fill = getAttrString(line, " fill");
-    if (style.fill.empty()) style.fill = "none";
-    style.stroke = getAttrString(line, " stroke");
-    if (style.stroke.empty()) style.stroke = "black";
+    string val;
 
-    style.fillOpacity = getAttrDouble(line, " fill-opacity", 1.0);
-    style.strokeOpacity = getAttrDouble(line, " stroke-opacity", 1.0);
-    style.strokeWidth = getAttrDouble(line, " stroke-width", 1.0);
+    val = getAttrString(line, " fill");
+    if (!val.empty()) style.setFill(val);
+
+    val = getAttrString(line, " stroke");
+    if (!val.empty()) style.setStroke(val);
+
+    style.setFillOpacity(getAttrDouble(line, " fill-opacity", 1.0));
+    style.setStrokeOpacity(getAttrDouble(line, " stroke-opacity", 1.0));
+    style.setStrokeWidth(getAttrDouble(line, " stroke-width", 1.0));
+
+    string font = getAttrString(line, "font-family");
+    if (!font.empty()) { style.setFontFamily(font); }
 
     return style;
 }
 
-// Đọc file SVG
 void SVGParser::parserFile(const string& filename) {
-    ifstream fin(filename);
-    string line;
-    vector<string> lines;
+    // 1. Dọn dẹp dữ liệu cũ
+    for (Shape* s : shapes) delete s; 
+    shapes.clear();
 
-    while (getline(fin, line)) {
-        lines.push_back(line);
+    ifstream fin(filename);
+    if (!fin.is_open()) return;
+
+    // 2. Đọc TOÀN BỘ file vào 1 chuỗi duy nhất (stringstream)
+    stringstream buffer;
+    buffer << fin.rdbuf();
+    string content = buffer.str();
+    
+    // 3. Biến tất cả xuống dòng/tab thành dấu cách (Làm phẳng file)
+    // Bước này giúp <text> ... </text> dù viết nhiều dòng cũng thành 1 dòng
+    for (char &c : content) {
+        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
     }
 
-    for (size_t i = 2; i + 1 < lines.size(); ++i) {
-        string l = lines[i];
+    // 4. Vòng lặp duyệt tìm thẻ
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Tìm dấu mở <
+        size_t startTag = content.find('<', pos);
+        if (startTag == string::npos) break;
 
-        if (l.size() >= 2) l = l.substr(2);
+        // Tìm dấu đóng > tạm thời để lấy tên thẻ
+        size_t firstClose = content.find('>', startTag);
+        if (firstClose == string::npos) break;
 
-        if (l.find("<rect") != string::npos) parserRect(l);
-        else if (l.find("<circle") != string::npos) parserCircle(l);
-        else if (l.find("<ellipse") != string::npos) parserEllipse(l);
-        else if (l.find("<text") != string::npos) parserText(l);
-        else if (l.find("<line") != string::npos) parserLine(l);
-        else if (l.find("<polyline") != string::npos) parserPolyline(l);
-        else if (l.find("<polygon") != string::npos) parserPolygon(l);
+        // Lấy tên thẻ (ví dụ: "rect", "text")
+        string tempTag = content.substr(startTag, firstClose - startTag + 1);
+        size_t endName = tempTag.find_first_of(" >/");
+        if (endName == string::npos) { pos = firstClose + 1; continue; }
+        
+        string tagName = tempTag.substr(1, endName - 1);
+
+        // --- XÁC ĐỊNH ĐIỂM KẾT THÚC CỦA THẺ ---
+        size_t endTag;
+
+        if (tagName == "text") {
+            // NẾU LÀ TEXT: Phải tìm cho đến khi gặp </text>
+            // Vì nội dung chữ nằm kẹp giữa, ta cần lấy trọn bộ
+            size_t closingTag = content.find("</text>", startTag);
+            if (closingTag != string::npos) {
+                // Kết thúc tại dấu > của thẻ đóng </text>
+                endTag = content.find('>', closingTag);
+            } else {
+                endTag = firstClose; // Fallback
+            }
+        } 
+        else if (tagName == "g") {
+             // Group thì xử lý riêng hoặc tạm thời lấy đến >
+             endTag = firstClose;
+        }
+        else {
+            // Các hình khác (rect, circle...): Kết thúc tại dấu > đầu tiên
+            endTag = firstClose;
+        }
+
+        if (endTag == string::npos) break;
+
+        // Trích xuất toàn bộ nội dung thẻ (Full Tag)
+        string tag = content.substr(startTag, endTag - startTag + 1);
+
+        // Phân loại loại hình
+        if (tagName == "g") {
+            // Xử lý Group (làm ở đây)
+        }
+        else if (tagName == "rect") parserRect(tag);
+        else if (tagName == "circle") parserCircle(tag);
+        else if (tagName == "ellipse") parserEllipse(tag);
+        else if (tagName == "line") parserLine(tag);
+        else if (tagName == "polyline") parserPolyline(tag);
+        else if (tagName == "polygon") parserPolygon(tag);
+        else if (tagName == "text") parserText(tag);
+
+        // Cập nhật vị trí để tìm thẻ tiếp theo
+        pos = endTag + 1;
     }
 }
 
@@ -112,11 +175,12 @@ void SVGParser::parserRect(const string& line) {
     int width = getAttrInt(line, " width", 0);
     int height = getAttrInt(line, " height", 0);
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Rect* rect = new Rect(x, y, width, height,
-                            style.stroke, style.strokeOpacity, style.strokeWidth,
-                            style.fill, style.fillOpacity);
+                        style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                        style.getFill(), style.getFillOpacity());
+                        
     shapes.push_back(rect);
 }
 
@@ -126,11 +190,12 @@ void SVGParser::parserCircle(const string& line) {
     int cy = getAttrInt(line, " cy", 0);
     int r = getAttrInt(line, " r", 0);
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Circle* circle = new Circle(cx, cy, r, 
-                                style.stroke, style.strokeOpacity, style.strokeWidth,
-                                style.fill, style.fillOpacity);
+                                style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                                style.getFill(), style.getFillOpacity());
+
     shapes.push_back(circle);
 }
 
@@ -141,34 +206,36 @@ void SVGParser::parserEllipse(const string& line) {
     int rx = getAttrInt(line, " rx", 0);
     int ry = getAttrInt(line, " ry", 0);
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Ellipse* ellipse = new Ellipse(cx, cy, rx, ry,
-                                    style.stroke, style.strokeOpacity, style.strokeWidth,
-                                    style.fill, style.fillOpacity);
+                                    style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                                    style.getFill(), style.getFillOpacity());
+
     shapes.push_back(ellipse);
 }
 
-// Parse Text
 void SVGParser::parserText(const string& line) {
     int x = getAttrInt(line, " x", 0);
     int y = getAttrInt(line, " y", 0);
-    int fontSize = getAttrInt(line, "font-size", 12);
+    int fontSize = getAttrInt(line, " font-size", 12);
+    string fontFamily = getAttrString(line, " font-family");
 
-    Style style = getStyle(line);
-
-    size_t start = line.find('>');
-    size_t end = line.find("</text>");
+    Style style = parserStyle(line);
 
     // Lấy nội dung giữa <text> và </text>
+    size_t start = line.find('>');
+    size_t end = line.find("</text>");
     string content;
+
     if (start != string::npos && end != string::npos && end > start) {
         content = line.substr(start + 1, end - start - 1);
     }
 
-    Text* text = new Text(x, y, fontSize, content, 
-                            style.stroke, style.strokeOpacity, style.strokeWidth,
-                            style.fill, style.fillOpacity);
+    Text* text = new Text(x, y, fontSize, content,
+                        style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                        style.getFill(), style.getFillOpacity(), style.getFontFamily());
+
     shapes.push_back(text);
 }
 
@@ -179,10 +246,11 @@ void SVGParser::parserLine(const string& line) {
     int x2 = getAttrInt(line, " x2", 0);
     int y2 = getAttrInt(line, " y2", 0);
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Line* ln = new Line(x1, y1, x2, y2, 
-                        style.stroke, style.strokeOpacity, style.strokeWidth);
+                        style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth());
+
     shapes.push_back(ln);
 }
 
@@ -190,11 +258,12 @@ void SVGParser::parserLine(const string& line) {
 void SVGParser::parserPolyline(const string& line) {
     vector<pair<int,int>> points = getPoints(getAttrString(line, " points"));
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Polyline* polyline = new Polyline(points, 
-                                        style.stroke, style.strokeOpacity, style.strokeWidth,
-                                        style.fill, style.fillOpacity);
+                                    style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                                    style.getFill(), style.getFillOpacity());
+
     shapes.push_back(polyline);
 }
 
@@ -202,10 +271,11 @@ void SVGParser::parserPolyline(const string& line) {
 void SVGParser::parserPolygon(const string& line) {
     vector<pair<int,int>> points = getPoints(getAttrString(line, " points"));
 
-    Style style = getStyle(line);
+    Style style = parserStyle(line);
 
     Polygon* polygon = new Polygon(points,
-                                    style.stroke, style.strokeOpacity, style.strokeWidth,
-                                    style.fill, style.fillOpacity);
+                                style.getStroke(), style.getStrokeOpacity(), style.getStrokeWidth(),
+                                style.getFill(), style.getFillOpacity());
+
     shapes.push_back(polygon);
 }
