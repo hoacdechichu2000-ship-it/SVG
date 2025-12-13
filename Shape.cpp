@@ -10,37 +10,20 @@ namespace SVG {
 // =========================
 
 // Constructor
-Shape::Shape (const std::string& stroke, double strokeOpacity, double strokeWidth)
-        : stroke(stroke), strokeOpacity(strokeOpacity), strokeWidth(strokeWidth) {}
+Shape::Shape (const Style& style) : style(style) {}
 
 // Destructor
 Shape::~Shape() {}
 
-/* ----- Getters ----- */
-const std::string& Shape::getStroke() const { return stroke; }
-double Shape::getStrokeOpacity() const { return strokeOpacity; }
-double Shape::getStrokeWidth() const { return strokeWidth; }
+/* ----- Getter & Setter ----- */
+const Style& Shape::getStyle() const { return style; }
+void Shape::setStyle(const Style& val) { style = val; }
 
-/* ----- Setters ----- */
-void Shape::setStroke(const std::string& val) { stroke = val;}
-void Shape::setStrokeOpacity(double val) { strokeOpacity = val;}
-void Shape::setStrokeWidth(double val) { strokeWidth = val;}
-
-// =========================
-// Unfilled Shape
-// =========================
+/* ========== Line ========= */ 
 
 // Constructor
-UnfilledShape::UnfilledShape(const std::string& stroke, double strokeOpacity, double strokeWidth)
-: Shape(stroke, strokeOpacity, strokeWidth) {}
-
-/* ========== Line (Unfilled Shape) ========= */ 
-
-// Constructor
-Line::Line(int x1, int y1, int x2, int y2, 
-            const std::string& stroke, double strokeOpacity, double strokeWidth)
-: UnfilledShape(stroke, strokeOpacity, strokeWidth), 
-    x1(x1),  y1(y1), x2(x2), y2(y2) {}
+Line::Line(int x1, int y1, int x2, int y2, const Style& style)
+    : Shape(style), x1(x1), y1(y1), x2(x2), y2(y2) {}
 
 /* ----- Getters ----- */
 int Line::getX1() const { return x1; }
@@ -54,32 +37,11 @@ void Line::setY1(int val) { y1 = val; }
 void Line::setX2(int val) { x2 = val; }
 void Line::setY2(int val) { y2 = val; }
 
-// =========================
-// Filled Shape
-// =========================
+/* ========== Rect ========= */ 
 
 // Constructor
-FilledShape::FilledShape (const std::string& stroke, double strokeOpacity, double strokeWidth, 
-                            const std::string& fill, double fillOpacity)
-: Shape(stroke, strokeOpacity, strokeWidth), 
-    fill(fill), fillOpacity(fillOpacity) {}
-
-/* ----- Getters ----- */
-const std::string& FilledShape::getFill() const { return fill; }
-double FilledShape::getFillOpacity() const { return fillOpacity; }
-
-/* ----- Setters ----- */
-void FilledShape::setFill(const std::string& val) { fill = val; }
-void FilledShape::setFillOpacity(double val) { fillOpacity = val; }
-
-/* ========== Rect (Filled Shape) ========= */ 
-
-// Constructor
-Rect::Rect(int x, int y, int width, int height,
-            const std::string& stroke, double strokeOpacity, double strokeWidth,
-            const std::string& fill, double fillOpacity)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    x(x), y(y), width(width), height(height) {}
+Rect::Rect(int x, int y, int width, int height, const Style& style)
+    : Shape(style), x(x), y(y), width(width), height(height) {}
 
 /* ----- Getters ----- */
 int Rect::getX() const { return x; }
@@ -94,14 +56,11 @@ void Rect::setWidth(int val) { width = val; }
 void Rect::setHeight(int val) { height = val; }
 
 
-/* ========== Circle (Filled Shape) ========= */ 
+/* ========== Circle ========= */ 
 
 // Constructor
-Circle::Circle(int cx, int cy, int r,
-                const std::string& stroke, double strokeOpacity, double strokeWidth,
-                const std::string& fill, double fillOpacity)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    cx(cx), cy(cy), r(r) {}
+Circle::Circle(int cx, int cy, int r, const Style& style)
+    : Shape(style), cx(cx), cy(cy), r(r) {}
 
 /* ----- Getters ----- */
 int Circle::getCX() const { return cx; }
@@ -113,14 +72,11 @@ void Circle::setCX(int val) { cx = val; }
 void Circle::setCY(int val) { cy = val; }
 void Circle::setR(int val) { r = val; }
 
-/* ========== Ellipse (Filled Shape) ========= */ 
+/* ========== Ellipse ========= */ 
 
 // Constructor
-Ellipse::Ellipse(int cx, int cy, int rx, int ry,
-                const std::string& stroke, double strokeOpacity, double strokeWidth,
-                const std::string& fill, double fillOpacity)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    cx(cx), cy(cy), rx(rx), ry(ry) {}
+Ellipse::Ellipse(int cx, int cy, int rx, int ry, const Style& style)
+    : Shape(style), cx(cx), cy(cy), rx(rx), ry(ry) {}
 
 /* ----- Getters ----- */
 int Ellipse::getCX() const { return cx; }
@@ -134,52 +90,41 @@ void Ellipse::setCY(int val) { cy = val; }
 void Ellipse::setRX(int val) { rx = val; }
 void Ellipse::setRY(int val) { ry = val; }
 
-/* ========== Text (Filled Shape) ========= */ 
+/* ========== Text ========= */ 
 
 // Constructor
-Text::Text(int x, int y, int fontSize, const std::string& content,
-            const std::string& stroke, double strokeOpacity, double strokeWidth,
-            const std::string& fill, double fillOpacity, const std::string& fontFamily)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    x(x), y(y), fontSize(fontSize), fontFamily(fontFamily), content(content) {}
+Text::Text(int x, int y, int fontSize, const std::string& content, const Style& style)
+    : Shape(style), x(x), y(y), fontSize(fontSize), content(content) {}
 
 /* ----- Getters ----- */
 int Text::getX() const { return x; }
 int Text::getY() const { return y; }
 int Text::getFontSize() const { return fontSize; }
-const std::string& Text::getFontFamily() const { return fontFamily; }
 const std::string& Text::getContent() const { return content; }
 
 /* ----- Setters ----- */
 void Text::setX(int val) { x = val; }
 void Text::setY(int val) { y = val; }
 void Text::setFontSize(int val) { fontSize = val; }
-void Text::setFontFamily(const std::string& val) { fontFamily = val; }
 void Text::setContent(const std::string& val) { content = val; }
 
-/* ========== Polyline (Filled Shape) ========= */ 
+/* ========== Polyline ========= */ 
 
 // Constructor
-Polyline::Polyline(const std::vector<std::pair<int, int>>& points,
-                    const std::string& stroke, double strokeOpacity, double strokeWidth,
-                    const std::string& fill, double fillOpacity)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    points(points) {}
+Polyline::Polyline(const std::vector<std::pair<int, int>>& points, const Style& style)
+    : Shape(style), points(points) {}
 
-/* ----- Getters ----- */
+/* ----- Getter ----- */
 const std::vector<std::pair<int, int>>& Polyline::getPoints() const { return points; }
 
-/* ----- Setters ----- */
+/* ----- Setter ----- */
 void Polyline::setPoints(const std::vector<std::pair<int, int>>& val) { points = val; }
 
-/* ========== Polygon (Filled Shape) ========= */ 
+/* ========== Polygon ========= */ 
 
 // Constructor
-Polygon::Polygon(const std::vector<std::pair<int, int>>& points,
-                const std::string& stroke, double strokeOpacity, double strokeWidth,
-                const std::string& fill, double fillOpacity)
-: FilledShape(stroke, strokeOpacity, strokeWidth, fill, fillOpacity),
-    points(points) {}
+Polygon::Polygon(const std::vector<std::pair<int, int>>& points, const Style& style)
+    : Shape(style), points(points) {}
 
 /* ----- Getters ----- */
 const std::vector<std::pair<int, int>>& Polygon::getPoints() const { return points; }
