@@ -5,6 +5,7 @@
 #include "Shape.h"
 #include <vector>
 #include <string>
+#include <stack>
 
 class SVGParser {
 private:
@@ -16,20 +17,11 @@ private:
     int getAttrInt(const std::string& line, const std::string& attr, int defaultValue) const;
     double getAttrDouble(const std::string& line, const std::string& attr, double defaultValue) const;
 
-    // Lấy thuộc tính points
-    std::vector<std::pair<int,int>> getPoints(const std::string& pointsStr) const;
-
-    // Parse từng loại Shape
-    void parserRect(const std::string& line);
-    void parserCircle(const std::string& line);
-    void parserEllipse(const std::string& line);
-    void parserText(const std::string& line);
-    void parserLine(const std::string& line);
-    void parserPolyline(const std::string& line);
-    void parserPolygon(const std::string& line);
-
     // Lấy các thuộc tính màu sắc
     SVG::Style parserStyle(const std::string& line) const;
+
+    // Lấy thuộc tính points
+    std::vector<std::pair<int,int>> getPoints(const std::string& pointsStr) const;
 
 public:
     // Constructor & Destructor
