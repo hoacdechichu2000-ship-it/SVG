@@ -6,30 +6,6 @@
 using namespace std; 
 using namespace SVG;
 
-// Vẽ hình
-void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
-    if (!shape) return;
-
-    GraphicsState state = g.Save(); // Lưu trạng thái
-    
-    if (const auto* l = dynamic_cast<const SVG::Line*>(shape))          drawLine(g, l);
-    else if (const auto* r = dynamic_cast<const SVG::Rect*>(shape))     drawRect(g, r);
-    else if (const auto* c = dynamic_cast<const SVG::Circle*>(shape))   drawCircle(g, c);
-    else if (const auto* e = dynamic_cast<const SVG::Ellipse*>(shape))  drawEllipse(g, e);
-    else if (const auto* pl = dynamic_cast<const SVG::Polyline*>(shape)) drawPolyline(g, pl);
-    else if (const auto* pg = dynamic_cast<const SVG::Polygon*>(shape))  drawPolygon(g, pg);
-    else if (const auto* t = dynamic_cast<const SVG::Text*>(shape))     drawText(g, t);
-
-    g.Restore(state); // Khôi phục trạng thái
-}
-
-// Render tất cả
-void Renderer::renderAll(Graphics& g, const vector<SVG::Shape*>& shapes) const {
-    for (const SVG::Shape* shape : shapes) {
-        drawShape(g, shape);
-    }
-}
-
 /* ----- Các hàm tiện ích ----- */
 
 // String to Wide string
@@ -80,115 +56,167 @@ Color parseColor(const string& colorStr, double opacity = 1.0) {
     return Color(alpha, (BYTE)r, (BYTE)g, (BYTE)b);
 }
 
+// Render tất cả
+void Renderer::renderAll(Graphics& g, const vector<SVG::Shape*>& shapes) const {
+    // Khử răng cưa
+    g.SetSmoothingMode(SmoothingModeAntiAlias);
+
+    for (const SVG::Shape* shape : shapes) {
+        drawShape(g, shape);
+    }
+}
+
+// Vẽ hình
+void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
+    if (!shape) return;
+
+    GraphicsState state = g.Save(); // Lưu trạng thái
+    
+    if (const auto* l = dynamic_cast<const SVG::Line*>(shape))          drawLine(g, l);
+    else if (const auto* r = dynamic_cast<const SVG::Rect*>(shape))     drawRect(g, r);
+    else if (const auto* c = dynamic_cast<const SVG::Circle*>(shape))   drawCircle(g, c);
+    else if (const auto* e = dynamic_cast<const SVG::Ellipse*>(shape))  drawEllipse(g, e);
+    else if (const auto* pl = dynamic_cast<const SVG::Polyline*>(shape)) drawPolyline(g, pl);
+    else if (const auto* pg = dynamic_cast<const SVG::Polygon*>(shape))  drawPolygon(g, pg);
+    else if (const auto* t = dynamic_cast<const SVG::Text*>(shape))     drawText(g, t);
+
+    g.Restore(state); // Khôi phục trạng thái
+}
+
 /* ----- Các hàm vẽ loại hình ----- */
 
 // Vẽ Line
 void Renderer::drawLine(Graphics& g, const SVG::Line* l) const {
-    Pen pen(parseColor(l->getStroke(), l->getStrokeOpacity()), (REAL)l->getStrokeWidth());
-    g.DrawLine(&pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+    const Style& s = l->getStyle();
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
+        g.DrawLine(&pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+    }
 }
 
 // Vẽ Rect
 void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
-    Pen pen(parseColor(r->getStroke(), r->getStrokeOpacity()), (REAL)r->getStrokeWidth());
-    SolidBrush brush(parseColor(r->getFill(), r->getFillOpacity()));
+    const Style& s = r->getStyle();
 
-    g.FillRectangle(&brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
-    g.DrawRectangle(&pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
+        g.FillRectangle(&brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+    }
+
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
+        g.DrawRectangle(&pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+    }
 }
 
 // Vẽ Circle
 void Renderer::drawCircle(Graphics& g, const SVG::Circle* c) const {
-    Pen pen(parseColor(c->getStroke(), c->getStrokeOpacity()), (REAL)c->getStrokeWidth());
-    SolidBrush brush(parseColor(c->getFill(), c->getFillOpacity()));
+    const Style& s = c->getStyle();
 
     int x = c->getCX() - c->getR();
     int y = c->getCY() - c->getR();
     int d = c->getR() * 2;
-    g.FillEllipse(&brush, x, y, d, d);
-    g.DrawEllipse(&pen, x, y, d, d);
+
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
+        g.FillEllipse(&brush, x, y, d, d);
+    }
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
+        g.DrawEllipse(&pen, x, y, d, d);
+    }
 }
 
 // Vẽ Ellipse
 void Renderer::drawEllipse(Graphics& g, const SVG::Ellipse* e) const {
-    Pen pen(parseColor(e->getStroke(), e->getStrokeOpacity()), (REAL)e->getStrokeWidth());
-    SolidBrush brush(parseColor(e->getFill(), e->getFillOpacity()));
+    const Style& s = e->getStyle();
 
     int x = e->getCX() - e->getRX();
     int y = e->getCY() - e->getRY();
     int w = e->getRX() * 2;
     int h = e->getRY() * 2;
-    g.FillEllipse(&brush, x, y, w, h);
-    g.DrawEllipse(&pen, x, y, w, h);
+
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
+        g.FillEllipse(&brush, x, y, w, h);
+    }
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
+        g.DrawEllipse(&pen, x, y, w, h);
+    }
 }
 
 // Vẽ Polyline
 void Renderer::drawPolyline(Graphics& g, const SVG::Polyline* pl) const {
-    Pen pen(parseColor(pl->getStroke(), pl->getStrokeOpacity()), (REAL)pl->getStrokeWidth());
-    SolidBrush brush(parseColor(pl->getFill(), pl->getFillOpacity()));
-
+    const Style& s = pl->getStyle();
+    
     vector<PointF> pts;
     for (const auto& p : pl->getPoints()) {
         pts.push_back(PointF((REAL)p.first, (REAL)p.second));
     }
     
-    if (pts.size() > 1) {
-        // Chỉ tô màu nếu alpha > 0 (tránh tô đen mặc định)
+    if (pts.size() < 2) return;
+
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
+        // Kiểm tra màu có trong suốt hoàn toàn không (để tránh tô đen mặc định)
         Color c; brush.GetColor(&c);
-        if (c.GetAlpha() > 0) g.FillPolygon(&brush, &pts[0], (int)pts.size());
-        
+        if (c.GetAlpha() > 0) {
+            g.FillPolygon(&brush, &pts[0], (int)pts.size());
+        }
+    }
+
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
         g.DrawLines(&pen, &pts[0], (int)pts.size());
     }
 }
 
 // Vẽ Polygon
 void Renderer::drawPolygon(Graphics& g, const SVG::Polygon* pg) const {
-    Pen pen(parseColor(pg->getStroke(), pg->getStrokeOpacity()), (REAL)pg->getStrokeWidth());
-    SolidBrush brush(parseColor(pg->getFill(), pg->getFillOpacity()));
+    const Style& s = pg->getStyle();
 
     vector<PointF> pts;
     for (const auto& p : pg->getPoints()) {
         pts.push_back(PointF((REAL)p.first, (REAL)p.second));
     }
 
-    if (pts.size() > 2) {
+    if (pts.size() < 3) return;
+
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
         g.FillPolygon(&brush, &pts[0], (int)pts.size());
+    }
+    if (s.getStroke() != "none") {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
         g.DrawPolygon(&pen, &pts[0], (int)pts.size());
     }
 }
 
 // Vẽ Text
 void Renderer::drawText(Graphics& g, const SVG::Text* t) const {
-    // Font Family
-    wstring wFontFamily = s2ws(t->getFontFamily());
+    const Style& s = t->getStyle();
+
+    wstring wFontFamily = s2ws(s.getFontFamily()); // Lấy font từ Style
     FontFamily fontFamily(wFontFamily.c_str());
 
     wstring ws = s2ws(t->getContent());
     
     PointF origin((REAL)t->getX(), (REAL)t->getY() - (REAL)t->getFontSize());
 
-    // Tạo GraphicsPath (Biến chữ thành hình vẽ)
     GraphicsPath path;
     path.AddString(
-        ws.c_str(),             // Nội dung chuỗi
-        -1,                     // Độ dài (-1 là tự đếm null-terminated)
-        &fontFamily,            // Font Family
-        FontStyleRegular,       // Kiểu chữ (Đậm/Nghiêng...)
-        (REAL)t->getFontSize(), // Cỡ chữ (emSize)
-        origin,                 // Vị trí
-        NULL                    // StringFormat
+        ws.c_str(), -1, &fontFamily,
+        FontStyleRegular, (REAL)t->getFontSize(), origin, NULL
     );
 
-    // Fill
-    SolidBrush brush(parseColor(t->getFill(), t->getFillOpacity()));
-    g.FillPath(&brush, &path);
+    if (s.getFill() != "none") {
+        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
+        g.FillPath(&brush, &path);
+    }
 
-    // Stroke
-    string strokeColor = t->getStroke();
-    double strokeWidth = t->getStrokeWidth();
-
-    if (strokeColor != "none" && !strokeColor.empty() && strokeWidth > 0) {
-        Pen pen(parseColor(strokeColor, t->getStrokeOpacity()), (REAL)strokeWidth);
+    if (s.getStroke() != "none" && s.getStrokeWidth() > 0) {
+        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
         g.DrawPath(&pen, &path);
     }
 }
