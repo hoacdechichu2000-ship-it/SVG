@@ -1,6 +1,7 @@
 #ifndef SHAPE_H
 #define SHAPE_H
 
+#include "Style.h"
 #include <string>
 #include <vector>
 
@@ -11,46 +12,27 @@ namespace SVG {
 // =========================
 
 class Shape {
-private:
-    std::string stroke;
-    double strokeOpacity, strokeWidth;
+protected:
+    Style style;
 
 public:
     // Constructor & Destructor
-    Shape (const std::string& stroke, double strokeOpacity, double strokeWidth);
+    Shape (const Style& style);
     virtual ~Shape();
 
-    // Getters
-    const std::string& getStroke() const;
-    double getStrokeOpacity() const;
-    double getStrokeWidth() const;
-
-    // Setters
-    void setStroke(const std::string& val);
-    void setStrokeOpacity(double val);
-    void setStrokeWidth(double val);
+    // Getter & Setter
+    const Style& getStyle() const;
+    void setStyle(const Style& val);
 };
+/* --------------- Line --------------- */ 
 
-// =========================
-// Unfilled Shape
-// =========================
-
-class UnfilledShape : public Shape {
-public:
-    // Constructor
-    UnfilledShape(const std::string& stroke, double strokeOpacity, double strokeWidth);
-};
-
-/* --------------- Line (Unfilled Shape) --------------- */ 
-
-class Line : public UnfilledShape {
+class Line : public Shape {
 private:
     int x1, y1, x2, y2;
 
 public:
     // Constructor
-    Line(int x1, int y1, int x2, int y2, 
-        const std::string& stroke, double strokeOpacity, double strokeWidth);
+    Line(int x1, int y1, int x2, int y2, const Style& style);
 
     // Getters
     int getX1() const;
@@ -65,40 +47,15 @@ public:
     void setY2(int val);
 };
 
-// =========================
-// Filled Shape
-// =========================
+/* --------------- Rect --------------- */ 
 
-class FilledShape : public Shape {
-private:
-    std::string fill;
-    double fillOpacity;
-
-public:
-    // Constructor
-    FilledShape (const std::string& stroke, double strokeOpacity, double strokeWidth, 
-                const std::string& fill, double fillOpacity);
-
-    // Getters
-    const std::string& getFill() const;
-    double getFillOpacity() const;
-
-    // Setters
-    void setFill(const std::string& val);
-    void setFillOpacity(double val);
-};
-
-/* --------------- Rect (Filled Shape) --------------- */ 
-
-class Rect : public FilledShape {
+class Rect : public Shape {
 private:
     int x, y, width, height;
 
 public:
     // Constructor
-    Rect(int x, int y, int width, int height,
-        const std::string& stroke, double strokeOpacity, double strokeWidth,
-        const std::string& fill, double fillOpacity);
+    Rect(int x, int y, int width, int height, const Style& style);
 
     // Getters
     int getX() const;
@@ -113,17 +70,15 @@ public:
     void setHeight(int val);
 };
 
-/* --------------- Circle (Filled Shape) --------------- */ 
+/* --------------- Circle --------------- */ 
 
-class Circle : public FilledShape {
+class Circle : public Shape {
 private:
     int cx, cy, r;
 
 public:
     // Constructor
-    Circle(int cx, int cy, int r,
-        const std::string& stroke, double strokeOpacity, double strokeWidth,
-        const std::string& fill, double fillOpacity);
+    Circle(int cx, int cy, int r, const Style& style);
 
     // Getters
     int getCX() const;
@@ -136,17 +91,15 @@ public:
     void setR(int val);
 };
 
-/* --------------- Ellipse (Filled Shape) --------------- */ 
+/* --------------- Ellipse --------------- */ 
 
-class Ellipse : public FilledShape {
+class Ellipse : public Shape {
 private:
     int cx, cy, rx, ry;
 
 public:
     // Constructor
-    Ellipse(int cx, int cy, int rx, int ry,
-            const std::string& stroke, double strokeOpacity, double strokeWidth,
-            const std::string& fill, double fillOpacity);
+    Ellipse(int cx, int cy, int rx, int ry, const Style& style);
 
     // Getters
     int getCX() const;
@@ -161,45 +114,39 @@ public:
     void setRY(int val);
 };
 
-/* --------------- Text (Filled Shape) --------------- */
+/* --------------- Text --------------- */
 
-class Text : public FilledShape {
+class Text : public Shape {
 private:
     int x, y, fontSize;
-    std::string content, fontFamily;
+    std::string content;
 
 public:
     // Constructor
-    Text(int x, int y, int fontSize, const std::string& content,
-        const std::string& stroke, double strokeOpacity, double strokeWidth,
-        const std::string& fill, double fillOpacity, const std::string& fontFamily);
+    Text(int x, int y, int fontSize, const std::string& content, const Style& style);
 
     // Getters
     int getX() const;
     int getY() const;
     int getFontSize() const;
-    const std::string& getFontFamily() const;
     const std::string& getContent() const;
 
     // Setters
     void setX(int val);
     void setY(int val);
     void setFontSize(int val);
-    void setFontFamily(const std::string& val);
     void setContent(const std::string& val);
 };
 
-/* --------------- Polyline (Filled Shape) --------------- */
+/* --------------- Polyline --------------- */
 
-class Polyline : public FilledShape {
+class Polyline : public Shape {
 private:
     std::vector<std::pair<int, int>> points;
 
 public:
     // Constructor
-    Polyline(const std::vector<std::pair<int, int>>& points,
-            const std::string& stroke, double strokeOpacity, double strokeWidth,
-            const std::string& fill, double fillOpacity);
+    Polyline(const std::vector<std::pair<int, int>>& points, const Style& style);
 
     // Getter
     const std::vector<std::pair<int, int>>& getPoints() const;
@@ -208,17 +155,15 @@ public:
     void setPoints(const std::vector<std::pair<int, int>>& val);
 };
 
-/* --------------- Polygon (Filled Shape) --------------- */
+/* --------------- Polygon --------------- */
 
-class Polygon : public FilledShape {
+class Polygon : public Shape {
 private:
     std::vector<std::pair<int, int>> points;
 
 public:
     // Constructor
-    Polygon(const std::vector<std::pair<int, int>>& points,
-            const std::string& stroke, double strokeOpacity, double strokeWidth,
-            const std::string& fill, double fillOpacity);
+    Polygon(const std::vector<std::pair<int, int>>& points, const Style& style);
 
     // Getter
     const std::vector<std::pair<int, int>>& getPoints() const;
