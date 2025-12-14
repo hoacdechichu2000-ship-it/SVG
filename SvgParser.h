@@ -3,14 +3,18 @@
 
 #include "Style.h"
 #include "Shape.h"
+#include "Gradient.h"
 #include <vector>
 #include <string>
-#include <stack>
+#include <map>
 
 class SVGParser {
 private:
     // lưu tất cả Shape
     std::vector<SVG::Shape*> shapes;    
+
+    // Lưu tất cả ID của gradient
+    std::map<std::string, SVG::LinearGradient> gradients;
 
     // Lấy các thông số string, int, double
     std::string getAttrString(const std::string& line, const std::string& attr) const;
@@ -31,8 +35,9 @@ public:
     // Đọc file SVG
     void parserFile(const std::string& filename);
 
-    // Getter
+    // Getters
     const std::vector<SVG::Shape*>& getShapes() const { return shapes; }
+    const std::map<std::string, SVG::LinearGradient>& getGradients() const { return gradients; }
 };
 
 #endif
