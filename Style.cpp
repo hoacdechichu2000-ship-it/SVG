@@ -10,6 +10,9 @@ Style::Style() {
     fillOpacity = 1.0; 
     strokeOpacity = 1.0;
     fontFamily = "Times New Roman";
+
+    fillRule = "nonzero";
+    strokeMiterLimit = 4.0;
 }
 
 /* ----- Getters ----- */
@@ -20,6 +23,9 @@ double Style::getStrokeWidth() const { return strokeWidth; }
 double Style::getFillOpacity() const { return fillOpacity; }
 double Style::getStrokeOpacity() const { return strokeOpacity; }
 const std::string& Style::getFontFamily() const { return fontFamily; }
+
+const std::string Style::getFillRule() const { return fillRule; }
+double Style::getStrokeMiterLimit() const { return strokeMiterLimit; }
 
 /* ----- Setters ----- */
 
@@ -44,5 +50,8 @@ void Style::setStrokeOpacity(double val) {
 }
 
 void Style::setFontFamily(const std::string& val) { fontFamily = val; }
+
+void Style::setFillRule(const std::string& val) { fillRule = val; }
+void Style::setStrokeMiterLimit(double val) { strokeMiterLimit = val; }
 
 }
