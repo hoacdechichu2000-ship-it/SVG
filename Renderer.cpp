@@ -18,14 +18,9 @@ wstring s2ws(const string& str) {
 }
 
 // Parse màu sắc
-Color parseColor(const string& colorStr, double opacity = 1.0) {
+Color Renderer::parseColor(const string& colorStr, double opacity = 1.0) const {
     if (colorStr == "none" || colorStr.empty()) return Color(0, 0, 0, 0); 
     if (colorStr == "black") return Color((BYTE)(opacity * 255), 0, 0, 0);
-    // if (colorStr == "red")   return Color((BYTE)(opacity * 255), 255, 0, 0);
-    // if (colorStr == "blue")  return Color((BYTE)(opacity * 255), 0, 0, 255);
-    // if (colorStr == "lime") return Color((BYTE)(opacity * 255), 0, 128, 0);
-    // if (colorStr == "lime") return Color((BYTE)(opacity * 255), 0, 255, 0);
-    // if (colorStr == "yellow") return Color((BYTE)(opacity * 255), 255, 255, 0);
     
     int r = 0, g = 0, b = 0; 
 
@@ -56,11 +51,92 @@ Color parseColor(const string& colorStr, double opacity = 1.0) {
     return Color(alpha, (BYTE)r, (BYTE)g, (BYTE)b);
 }
 
+// Tạo bút (Pen), dùng cho Stroke
+Gdiplus::Pen* Renderer::createPen(const SVG::Style& style) const {
+    if (style.getStroke() == "none" || style.getStroke().empty() || style.getStrokeWidth() <= 0) return nullptr;
+
+    Color c = parseColor(style.getStroke(), style.getStrokeOpacity());
+    Gdiplus::Pen* pen = new Gdiplus::Pen(c, (REAL)style.getStrokeWidth());
+
+    pen->SetMiterLimit((REAL)style.getStrokeMiterLimit());
+    
+    return pen;
+}
+
+// Tạo cọ (Brush), dùng cho Fill
+Gdiplus::Brush* Renderer::createBrush(const SVG::Style& style, const Gdiplus::RectF& bounds) const {
+    string fill = style.getFill();
+    if (fill == "none" || fill.empty()) return nullptr;
+
+    // Xử lý gradient từ ID
+    if (fill.find("url(#") == 0 && gradientMap != nullptr) {
+        // Cắt chuỗi để lấy ID
+        size_t start = 5; 
+        size_t end = fill.find(")");
+        if (end != string::npos) {
+            string id = fill.substr(start, end - start);
+            
+            // Tìm trong Map
+            auto it = gradientMap->find(id);
+            if (it != gradientMap->end()) {
+                const SVG::LinearGradient& grad = it->second;
+                
+                PointF p1, p2;
+
+                // Xử lý tọa độ
+                if (grad.gradientUnits == "userSpaceOnUse") {
+                    // Tọa độ tuyệt đối
+                    p1 = PointF(grad.x1, grad.y1);
+                    p2 = PointF(grad.x2, grad.y2);
+                } 
+                else { 
+                    // Tọa độ theo tỉ lệ 0.0 -> 1.0 của hình (objectBoundingBox)
+                    REAL x = bounds.X;
+                    REAL y = bounds.Y;
+                    REAL w = bounds.Width;
+                    REAL h = bounds.Height;
+
+                    p1 = PointF(x + grad.x1 * w, y + grad.y1 * h);
+                    p2 = PointF(x + grad.x2 * w, y + grad.y2 * h);
+                }
+
+                // Tạo LinearGradientBrush
+                LinearGradientBrush* brush = new LinearGradientBrush(p1, p2, Color::Black, Color::White);
+                
+                // Xử lý Spread Method (Lặp màu)
+                if (grad.spreadMethod == "reflect") brush->SetWrapMode(WrapModeTileFlipXY);
+                else if (grad.spreadMethod == "repeat") brush->SetWrapMode(WrapModeTile);
+                else brush->SetWrapMode(WrapModeTile);
+
+                // Xử lý Stops (Danh sách màu)
+                int count = (int)grad.stops.size();
+                if (count > 0) {
+                    Color* colors = new Color[count];
+                    REAL* positions = new REAL[count];
+                    
+                    for (int i = 0; i < count; i++) {
+                        positions[i] = (REAL)grad.stops[i].offset;
+                        colors[i] = parseColor(grad.stops[i].color, grad.stops[i].opacity);
+                    }
+                    
+                    brush->SetInterpolationColors(colors, positions, count);
+                    
+                    delete[] colors;
+                    delete[] positions;
+                }
+                
+                return brush;
+            }
+        }
+    }
+
+    // Mặc định: Solid Brush
+    Color c = parseColor(style.getFill(), style.getFillOpacity());
+    return new Gdiplus::SolidBrush(c);
+}
+
 // Render tất cả
 void Renderer::renderAll(Graphics& g, const vector<SVG::Shape*>& shapes) const {
-    // Khử răng cưa
-    g.SetSmoothingMode(SmoothingModeAntiAlias);
-
     for (const SVG::Shape* shape : shapes) {
         drawShape(g, shape);
     }
@@ -85,27 +161,32 @@ void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
 
 /* ----- Các hàm vẽ loại hình ----- */
 
-// Vẽ Line
+// Vẽ Line (không có fill nên chỉ dùng Pen)
 void Renderer::drawLine(Graphics& g, const SVG::Line* l) const {
-    const Style& s = l->getStyle();
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawLine(&pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+    Gdiplus::Pen* pen = createPen(l->getStyle());
+    if (pen) {
+        g.DrawLine(pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+        delete pen;
     }
 }
 
 // Vẽ Rect
 void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
     const Style& s = r->getStyle();
+    RectF bounds((REAL)r->getX(), (REAL)r->getY(), (REAL)r->getWidth(), (REAL)r->getHeight());
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        g.FillRectangle(&brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+    // Fill
+    Gdiplus::Brush* brush = createBrush(s, bounds);
+    if (brush) {
+        g.FillRectangle(brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        delete brush;
     }
 
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawRectangle(&pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+    // Stroke
+    Gdiplus::Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawRectangle(pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        delete pen;
     }
 }
 
@@ -113,17 +194,23 @@ void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
 void Renderer::drawCircle(Graphics& g, const SVG::Circle* c) const {
     const Style& s = c->getStyle();
 
-    int x = c->getCX() - c->getR();
-    int y = c->getCY() - c->getR();
-    int d = c->getR() * 2;
+    REAL x = (REAL)(c->getCX() - c->getR());
+    REAL y = (REAL)(c->getCY() - c->getR());
+    REAL d = (REAL)(c->getR() * 2);
+    RectF bounds(x, y, d, d);
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        g.FillEllipse(&brush, x, y, d, d);
+    // Fill
+    Brush* brush = createBrush(c->getStyle(), bounds);
+    if (brush) {
+        g.FillEllipse(brush, bounds);
+        delete brush;
     }
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawEllipse(&pen, x, y, d, d);
+    
+    // Stroke
+    Pen* pen = createPen(c->getStyle());
+    if (pen) {
+        g.DrawEllipse(pen, bounds);
+        delete pen;
     }
 }
 
@@ -131,18 +218,24 @@ void Renderer::drawCircle(Graphics& g, const SVG::Circle* c) const {
 void Renderer::drawEllipse(Graphics& g, const SVG::Ellipse* e) const {
     const Style& s = e->getStyle();
 
-    int x = e->getCX() - e->getRX();
-    int y = e->getCY() - e->getRY();
-    int w = e->getRX() * 2;
-    int h = e->getRY() * 2;
+    REAL x = (REAL)(e->getCX() - e->getRX());
+    REAL y = (REAL)(e->getCY() - e->getRY());
+    REAL w = (REAL)(e->getRX() * 2);
+    REAL h = (REAL)(e->getRY() * 2);
+    RectF bounds(x, y, w, h);
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        g.FillEllipse(&brush, x, y, w, h);
+    // Fill
+    Gdiplus::Brush* brush = createBrush(s, bounds);
+    if (brush) {
+        g.FillEllipse(brush, bounds);
+        delete brush;
     }
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawEllipse(&pen, x, y, w, h);
+
+    // Stroke
+    Gdiplus::Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawEllipse(pen, bounds);
+        delete pen;
     }
 }
 
@@ -150,25 +243,38 @@ void Renderer::drawEllipse(Graphics& g, const SVG::Ellipse* e) const {
 void Renderer::drawPolyline(Graphics& g, const SVG::Polyline* pl) const {
     const Style& s = pl->getStyle();
     
-    vector<PointF> pts;
+    vector<PointF> pts;    
+
+    REAL minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+
     for (const auto& p : pl->getPoints()) {
-        pts.push_back(PointF((REAL)p.first, (REAL)p.second));
+        REAL px = (REAL)p.first;
+        REAL py = (REAL)p.second;
+        pts.push_back(PointF(px, py));
+
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
     }
-    
+
     if (pts.size() < 2) return;
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        // Kiểm tra màu có trong suốt hoàn toàn không (để tránh tô đen mặc định)
-        Color c; brush.GetColor(&c);
-        if (c.GetAlpha() > 0) {
-            g.FillPolygon(&brush, &pts[0], (int)pts.size());
-        }
+    RectF bounds(minX, minY, maxX - minX, maxY - minY);
+
+    // Fill
+    Gdiplus::Brush* brush = createBrush(s, bounds);
+    if (brush) {
+        FillMode mode = (s.getFillRule() == "evenodd") ? FillModeAlternate : FillModeWinding;
+        g.FillPolygon(brush, &pts[0], (int)pts.size(), mode);
+        delete brush;
     }
 
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawLines(&pen, &pts[0], (int)pts.size());
+    // Stroke
+    Gdiplus::Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawLines(pen, &pts[0], (int)pts.size());
+        delete pen;
     }
 }
 
@@ -177,19 +283,37 @@ void Renderer::drawPolygon(Graphics& g, const SVG::Polygon* pg) const {
     const Style& s = pg->getStyle();
 
     vector<PointF> pts;
+    
+    REAL minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+
     for (const auto& p : pg->getPoints()) {
-        pts.push_back(PointF((REAL)p.first, (REAL)p.second));
+        REAL px = (REAL)p.first;
+        REAL py = (REAL)p.second;
+        pts.push_back(PointF(px, py));
+
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
     }
 
     if (pts.size() < 3) return;
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        g.FillPolygon(&brush, &pts[0], (int)pts.size());
+    RectF bounds(minX, minY, maxX - minX, maxY - minY);
+
+    // Fill
+    Gdiplus::Brush* brush = createBrush(pg->getStyle(), bounds);
+    if (brush) {
+        FillMode mode = (s.getFillRule() == "evenodd") ? FillModeAlternate : FillModeWinding;
+        g.FillPolygon(brush, &pts[0], (int)pts.size(), mode);
+        delete brush;
     }
-    if (s.getStroke() != "none") {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawPolygon(&pen, &pts[0], (int)pts.size());
+
+    // Stroke
+    Gdiplus::Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawPolygon(pen, &pts[0], (int)pts.size());
+        delete pen;
     }
 }
 
@@ -197,26 +321,34 @@ void Renderer::drawPolygon(Graphics& g, const SVG::Polygon* pg) const {
 void Renderer::drawText(Graphics& g, const SVG::Text* t) const {
     const Style& s = t->getStyle();
 
-    wstring wFontFamily = s2ws(s.getFontFamily()); // Lấy font từ Style
+    wstring wFontFamily = s2ws(s.getFontFamily());
     FontFamily fontFamily(wFontFamily.c_str());
 
     wstring ws = s2ws(t->getContent());
-    
     PointF origin((REAL)t->getX(), (REAL)t->getY() - (REAL)t->getFontSize());
 
+    // Tạo Path chữ
     GraphicsPath path;
     path.AddString(
         ws.c_str(), -1, &fontFamily,
         FontStyleRegular, (REAL)t->getFontSize(), origin, NULL
     );
 
-    if (s.getFill() != "none") {
-        SolidBrush brush(parseColor(s.getFill(), s.getFillOpacity()));
-        g.FillPath(&brush, &path);
+    // Bounds
+    RectF bounds;
+    path.GetBounds(&bounds);
+
+    // Fill
+    Gdiplus::Brush* brush = createBrush(s, bounds);
+    if (brush) {
+        g.FillPath(brush, &path);
+        delete brush;
     }
 
-    if (s.getStroke() != "none" && s.getStrokeWidth() > 0) {
-        Pen pen(parseColor(s.getStroke(), s.getStrokeOpacity()), (REAL)s.getStrokeWidth());
-        g.DrawPath(&pen, &path);
+    // Stroke
+    Gdiplus::Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawPath(pen, &path);
+        delete pen;
     }
 }
