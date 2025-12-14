@@ -285,6 +285,7 @@ void AppWindow::OnPaint(HDC hdc)
     bufferGraphics.TranslateTransform(-cx, -cy);
 
     // Vẽ hình
+    m_renderer.setGradients(&m_parser.getGradients());
     m_renderer.renderAll(bufferGraphics, m_parser.getShapes());
 
     // Vẽ bộ đệm ảo ra màn hình thật (HDC)
