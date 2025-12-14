@@ -80,8 +80,13 @@ SVG::Style SVGParser::parserStyle(const string& line) const {
     style.setStrokeOpacity(getAttrDouble(line, " stroke-opacity", 1.0));
     style.setStrokeWidth(getAttrDouble(line, " stroke-width", 1.0));
 
-    string font = getAttrString(line, "font-family");
-    if (!font.empty()) { style.setFontFamily(font); }
+    val = getAttrString(line, "font-family");
+    if (!val.empty()) { style.setFontFamily(val); }
+
+    val = getAttrString(line, "fill-rule");
+    if (!val.empty()) { style.setFillRule(val); }
+
+    style.setStrokeMiterLimit(getAttrDouble(line, "stroke-miterlimit", 4.0));
 
     return style;
 }
@@ -90,9 +95,12 @@ void SVGParser::parserFile(const string& filename) {
     // Reset dữ liệu cũ
     for (Shape* s : shapes) delete s; 
     shapes.clear();
+    gradients.clear();
 
     ifstream fin(filename);
     if (!fin.is_open()) return;
+
+    SVG::LinearGradient* currentGradient = nullptr;
 
     // Đọc và làm phẳng file
     stringstream buffer;
@@ -133,8 +141,42 @@ void SVGParser::parserFile(const string& filename) {
         Style style = parserStyle(tagFull);
         Shape* newShape = nullptr;
 
-        // Tạo hình tương ứng tên thẻ
-        if (tagName == "rect") {
+        // Xử lý Linear Gradient
+        if (tagName == "linearGradient") {
+            string id = getAttrString(tagFull, "id");
+            if (!id.empty()) {
+                SVG::LinearGradient grad(id);
+
+                grad.x1 = getAttrDouble(tagFull, "x1", 0);
+                grad.y1 = getAttrDouble(tagFull, "y1", 0);
+                grad.x2 = getAttrDouble(tagFull, "x2", 0);
+                grad.y2 = getAttrDouble(tagFull, "y2", 0);
+
+                string units = getAttrString(tagFull, "gradientUnits");
+                if (!units.empty()) grad.gradientUnits = units;
+
+                string spread = getAttrString(tagFull, "spreadMethod");
+                if (!spread.empty()) grad.spreadMethod = spread;
+
+                gradients[id] = grad;
+                currentGradient = &gradients[id];
+            }
+        }
+        else if (tagName == "stop") {
+            if (currentGradient != nullptr) {
+                double offset = getAttrDouble(tagFull, "offset", 0.0);
+                double opacity = getAttrDouble(tagFull, "opacity", 1.0);
+                string color = getAttrString(tagFull, "stop-color");
+
+                currentGradient->addStop(offset, color, opacity);
+            }
+        }
+        else if (tagName == "/linearGradient") {
+            currentGradient == nullptr;
+        }
+
+        // Xử lý các loại hình
+        else if (tagName == "rect") {
             int x = getAttrInt(tagFull, " x", 0);
             int y = getAttrInt(tagFull, " y", 0);
             int w = getAttrInt(tagFull, " width", 0);
