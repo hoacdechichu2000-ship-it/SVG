@@ -11,6 +11,9 @@ private:
     double strokeWidth, fillOpacity, strokeOpacity;
     std::string fontFamily;
 
+    std::string fillRule;
+    double strokeMiterLimit;
+
 public:
     // Constructor
     Style();
@@ -24,6 +27,9 @@ public:
     double getStrokeOpacity() const;
     const std::string& getFontFamily() const;
 
+    const std::string getFillRule() const;
+    double getStrokeMiterLimit() const;
+
     /* ----- Setters ----- */
 
     void setFill(const std::string& val);
@@ -32,6 +38,9 @@ public:
     void setFillOpacity(double val);
     void setStrokeOpacity(double val);
     void setFontFamily(const std::string& val);
+
+    void setFillRule(const std::string& val);
+    void setStrokeMiterLimit(double val);
 };
 
 }
