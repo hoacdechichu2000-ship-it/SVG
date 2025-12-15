@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <stack>
 
 using namespace std;
 using namespace SVG;
@@ -16,28 +17,33 @@ SVGParser::~SVGParser() {
 
 // Lấy thông số string
 string SVGParser::getAttrString(const string& line, const string& attr) const {
-    string actualAttr = attr;
-    
-    size_t pos = line.find(actualAttr + "=\"");
-
-    if (pos == string::npos && attr.size() > 0 && attr[0] == ' ') {
-        actualAttr = attr.substr(1);
-        pos = line.find(actualAttr + "=\"");
-    }
-    
+    size_t pos = line.find(attr);
     if (pos == string::npos) return "";
+
+    pos += attr.length();
+
+    while (pos < line.length() && isspace(line[pos])) pos++;
     
-    pos += actualAttr.length() + 2;
+    if (pos >= line.length() || line[pos] != '=') return "";
+    pos++;
 
-    size_t end = line.find("\"", pos);
-    if (end == string::npos) return "";
-    return line.substr(pos, end - pos);
-}
+    while (pos < line.length() && isspace(line[pos])) pos++;
+    if (pos >= line.length()) return "";
 
-// Lấy thông số int
-int SVGParser::getAttrInt(const string& line, const string& attr, int defaultValue) const {
-    string s = getAttrString(line, attr);
-    return s.empty() ? defaultValue : stoi(s);
+    char quote = line[pos];
+    if (quote == '\"' || quote == '\'') {
+        pos++;
+        size_t end = line.find(quote, pos);
+        if (end == string::npos) return "";
+        return line.substr(pos, end - pos);
+    } 
+    else {
+        size_t start = pos;
+        while (pos < line.length() && !isspace(line[pos]) && line[pos] != '/' && line[pos] != '>') {
+            pos++;
+        }
+        return line.substr(start, pos - start);
+    }
 }
 
 // Lấy thông số double
@@ -47,19 +53,19 @@ double SVGParser::getAttrDouble(const string& line, const string& attr, double d
 }
 
 // Lấy thuộc tính points
-vector<pair<int,int>> SVGParser::getPoints(const string& pointsStr) const {
-    vector<pair<int,int>> points;
-    istringstream ss(pointsStr);
-    string coordinate;
-
-    while (ss >> coordinate) {
-        size_t comma = coordinate.find(',');
-        if (comma != string::npos) {
-            int x = stoi(coordinate.substr(0, comma));
-            int y = stoi(coordinate.substr(comma + 1));
-            points.push_back({x, y});
-        }
+vector<pair<double, double>> SVGParser::getPoints(const string& pointsStr) const {
+    vector<pair<double, double>> points;
+    
+    // Thay dấu ',' thành ' ' để dễ xử lý
+    string temp = pointsStr;
+    for (char &c : temp) {
+        if (c == ',') c = ' ';
     }
+
+    // Xử lý thông số
+    stringstream ss(temp);
+    double x, y;
+    while (ss >> x >> y) points.push_back({x, y});
 
     return points;
 }
@@ -68,29 +74,67 @@ vector<pair<int,int>> SVGParser::getPoints(const string& pointsStr) const {
 SVG::Style SVGParser::parserStyle(const string& line) const {
     Style style;
 
-    string val;
+    // Xử lý fill (Tránh fill-opacity, fill-rule)
+    string fillKey = " fill";
+    size_t fPos = line.find(fillKey);
+    while (fPos != string::npos) {
+        char next = line[fPos + fillKey.length()];
+        if (next == '-') {  // Không phải fill
+            fPos = line.find(fillKey, fPos + 1);
+        } else {            // Tìm đúng fill
+            string val = getAttrString(line.substr(fPos), fillKey);
+            if (!val.empty()) style.setFill(val);
+            break;
+        }
+    }
 
-    val = getAttrString(line, " fill");
-    if (!val.empty()) style.setFill(val);
+    // Xử lý stroke (Tránh stroke-width, stroke-opacity...)
+    string strokeKey = " stroke";
+    size_t sPos = line.find(strokeKey);
+    while (sPos != string::npos) {
+        char next = line[sPos + strokeKey.length()];
+        if (next == '-') {  // Không phải stroke
+            sPos = line.find(strokeKey, sPos + 1);
+        } else {            // Tìm đúng stroke
+            string val = getAttrString(line.substr(sPos), strokeKey);
+            if (!val.empty()) style.setStroke(val);
+            break;
+        }
+    }
 
-    val = getAttrString(line, " stroke");
-    if (!val.empty()) style.setStroke(val);
+    double sf = getAttrDouble(line, " fill-opacity", -1.0);
+    style.setFillOpacity(sf);
 
-    style.setFillOpacity(getAttrDouble(line, " fill-opacity", 1.0));
-    style.setStrokeOpacity(getAttrDouble(line, " stroke-opacity", 1.0));
-    style.setStrokeWidth(getAttrDouble(line, " stroke-width", 1.0));
+    double so = getAttrDouble(line, " stroke-opacity", -1.0);
+    style.setStrokeOpacity(so);
 
-    val = getAttrString(line, "font-family");
-    if (!val.empty()) { style.setFontFamily(val); }
+    double sw = getAttrDouble(line, " stroke-width", -1.0);
+    style.setStrokeWidth(sw);
 
-    val = getAttrString(line, "fill-rule");
-    if (!val.empty()) { style.setFillRule(val); }
+    double fs = getAttrDouble(line, " font-size", -1.0);
+    style.setFontSize(fs);
 
-    style.setStrokeMiterLimit(getAttrDouble(line, "stroke-miterlimit", 4.0));
+    string font = getAttrString(line, "font-family");
+    if (!font.empty()) { style.setFontFamily(font); }
+
+    string fw = getAttrString(line, "font-weight");
+    if (!fw.empty()) style.setFontWeight(fw);
+
+    string fst = getAttrString(line, "font-style");
+    if (!fst.empty()) style.setFontStyle(fst);
+
+    string ta = getAttrString(line, "text-anchor");
+    if (!ta.empty()) style.setTextAnchor(ta);
+
+    string fr = getAttrString(line, "fill-rule");
+    if (!fr.empty()) { style.setFillRule(fr); }
+
+    double sml = getAttrDouble(line, "stroke-miterlimit", -1.0);
+    style.setStrokeMiterLimit(sml);
 
     // Transform
-    val = getAttrString(line, " transform");
-    if (!val.empty()) { style.setTransform(val); }
+    string transform = getAttrString(line, " transform");
+    if (!transform.empty()) { style.setTransform(transform); }
 
     return style;
 }
@@ -104,6 +148,7 @@ void SVGParser::parserFile(const string& filename) {
     ifstream fin(filename);
     if (!fin.is_open()) return;
 
+    std::stack<SVG::Group*> groupStack;
     SVG::LinearGradient* currentGradient = nullptr;
 
     // Đọc và làm phẳng file
@@ -117,9 +162,11 @@ void SVGParser::parserFile(const string& filename) {
 
     size_t pos = 0;
     while (pos < content.length()) {
+        // Tìm dấu '<'
         size_t startTag = content.find('<', pos);
         if (startTag == string::npos) break;
 
+        // Tìm dấu '>'
         size_t endTag = content.find('>', startTag);
         if (endTag == string::npos) break;
 
@@ -128,7 +175,7 @@ void SVGParser::parserFile(const string& filename) {
 
         // Lấy tên thẻ
         string tempTag = tagFull;
-        size_t endName = tempTag.find_first_of(" >/");
+        size_t endName = tempTag.find_first_of(" >\t\n");
         if (endName == string::npos) { pos = endTag + 1; continue; }
         string tagName = tempTag.substr(1, endName - 1);
 
@@ -141,11 +188,7 @@ void SVGParser::parserFile(const string& filename) {
             }
         }
 
-        // Lấy Style
-        Style style = parserStyle(tagFull);
-        Shape* newShape = nullptr;
-
-        // Xử lý Linear Gradient
+        // Xử lý thẻ mở <linearGradient>
         if (tagName == "linearGradient") {
             string id = getAttrString(tagFull, "id");
             if (!id.empty()) {
@@ -166,6 +209,8 @@ void SVGParser::parserFile(const string& filename) {
                 currentGradient = &gradients[id];
             }
         }
+
+        // Xử lý thẻ <stop>
         else if (tagName == "stop") {
             if (currentGradient != nullptr) {
                 double offset = getAttrDouble(tagFull, "offset", 0.0);
@@ -175,64 +220,99 @@ void SVGParser::parserFile(const string& filename) {
                 currentGradient->addStop(offset, color, opacity);
             }
         }
+
+        // Xử lý thẻ đóng </linearGradient>
         else if (tagName == "/linearGradient") {
             currentGradient = nullptr;
         }
 
-        // Xử lý các loại hình
-        else if (tagName == "rect") {
-            int x = getAttrInt(tagFull, " x", 0);
-            int y = getAttrInt(tagFull, " y", 0);
-            int w = getAttrInt(tagFull, " width", 0);
-            int h = getAttrInt(tagFull, " height", 0);
-            newShape = new Rect(x, y, w, h, style);
-        }
-        else if (tagName == "circle") {
-            int cx = getAttrInt(tagFull, " cx", 0);
-            int cy = getAttrInt(tagFull, " cy", 0);
-            int r = getAttrInt(tagFull, " r", 0);
-            newShape = new Circle(cx, cy, r, style);
-        }
-        else if (tagName == "ellipse") {
-            int cx = getAttrInt(tagFull, " cx", 0);
-            int cy = getAttrInt(tagFull, " cy", 0);
-            int rx = getAttrInt(tagFull, " rx", 0);
-            int ry = getAttrInt(tagFull, " ry", 0);
-            newShape = new Ellipse(cx, cy, rx, ry, style);
-        }
-        else if (tagName == "line") {
-            int x1 = getAttrInt(tagFull, " x1", 0);
-            int y1 = getAttrInt(tagFull, " y1", 0);
-            int x2 = getAttrInt(tagFull, " x2", 0);
-            int y2 = getAttrInt(tagFull, " y2", 0);
-            newShape = new Line(x1, y1, x2, y2, style);
-        }
-        else if (tagName == "polyline") {
-            vector<pair<int,int>> pts = getPoints(getAttrString(tagFull, " points"));
-            newShape = new Polyline(pts, style);
-        }
-        else if (tagName == "polygon") {
-            vector<pair<int,int>> pts = getPoints(getAttrString(tagFull, " points"));
-            newShape = new Polygon(pts, style);
-        }
-        else if (tagName == "text") {
-            int x = getAttrInt(tagFull, " x", 0);
-            int y = getAttrInt(tagFull, " y", 0);
-            int fontSize = getAttrInt(tagFull, " font-size", 12);
-            
-            // Trích xuất nội dung
-            string contentStr = "";
-            size_t startContent = tagFull.find('>');
-            size_t endContent = tagFull.rfind('<'); 
-            if (startContent != string::npos && endContent != string::npos && endContent > startContent) {
-                contentStr = tagFull.substr(startContent + 1, endContent - startContent - 1);
-            }
-            newShape = new Text(x, y, fontSize, contentStr, style);
+        // Xử lý thẻ đóng </g>
+        else if (tagName == "/g") {
+            // Quay về tầng cha
+            if (!groupStack.empty()) groupStack.pop();
         }
 
-        // Thêm Shape vào danh sách
-        if (newShape != nullptr) {
-            shapes.push_back(newShape);
+        // Xử lý thẻ mở <g>
+        else if (tagName == "g") {
+            Style style = parserStyle(tagFull);
+            SVG::Group* newGroup = new SVG::Group(style);
+
+            // Nếu đang ở trong group khác, thêm vào group đó
+            if (!groupStack.empty()) groupStack.top()->addShape(newGroup);
+            // Nếu ở tầng ngoài cùng, thêm vào danh sách chính
+            else shapes.push_back(newGroup);
+
+            // Đẩy group mới vào stack để làm cha của các hình tiếp theo
+            groupStack.push(newGroup);
+        }
+
+        // Xử lý các hình cơ bản của Shape
+        else {
+            Shape* newShape = nullptr;
+            Style style = parserStyle(tagFull); // Lấy style (bao gồm cả transform)
+
+            if (tagName == "rect") {
+                double x = getAttrDouble(tagFull, " x", 0.0);
+                double y = getAttrDouble(tagFull, " y", 0.0);
+                double w = getAttrDouble(tagFull, " width", 0.0);
+                double h = getAttrDouble(tagFull, " height", 0.0);
+                newShape = new Rect(x, y, w, h, style);
+            }
+            else if (tagName == "circle") {
+                double cx = getAttrDouble(tagFull, " cx", 0.0);
+                double cy = getAttrDouble(tagFull, " cy", 0.0);
+                double r = getAttrDouble(tagFull, " r", 0.0);
+                newShape = new Circle(cx, cy, r, style);
+            }
+            else if (tagName == "ellipse") {
+                double cx = getAttrDouble(tagFull, " cx", 0.0);
+                double cy = getAttrDouble(tagFull, " cy", 0.0);
+                double rx = getAttrDouble(tagFull, " rx", 0.0);
+                double ry = getAttrDouble(tagFull, " ry", 0.0);
+                newShape = new Ellipse(cx, cy, rx, ry, style);
+            }
+            else if (tagName == "line") {
+                double x1 = getAttrDouble(tagFull, " x1", 0.0);
+                double y1 = getAttrDouble(tagFull, " y1", 0.0);
+                double x2 = getAttrDouble(tagFull, " x2", 0.0);
+                double y2 = getAttrDouble(tagFull, " y2", 0.0);
+                newShape = new Line(x1, y1, x2, y2, style);
+            }
+            else if (tagName == "polyline") {
+                vector<pair<double, double>> pts = getPoints(getAttrString(tagFull, " points"));
+                newShape = new Polyline(pts, style);
+            }
+            else if (tagName == "polygon") {
+                vector<pair<double, double>> pts = getPoints(getAttrString(tagFull, " points"));
+                newShape = new Polygon(pts, style);
+            }
+            else if (tagName == "path") {
+                string d = getAttrString(tagFull, " d");
+                newShape = new Path(d, style);
+            }
+            else if (tagName == "text") {
+                double x = getAttrDouble(tagFull, " x", 0.0);
+                double y = getAttrDouble(tagFull, " y", 0.0);
+
+                double dx = getAttrDouble(tagFull, " dx", 0.0); 
+                double dy = getAttrDouble(tagFull, " dy", 0.0);
+
+                string contentStr = "";
+                size_t startContent = tagFull.find('>');
+                size_t endContent = tagFull.rfind('<'); 
+                if (startContent != string::npos && endContent != string::npos && endContent > startContent) {
+                    contentStr = tagFull.substr(startContent + 1, endContent - startContent - 1);
+                }
+                newShape = new Text(x, y, dx, dy, contentStr, style);
+            }
+
+            // Lưu shape vào danh sách
+            if (newShape != nullptr) {
+                // Nếu Stack có hàng -> Thêm vào Group cha hiện tại
+                if (!groupStack.empty()) groupStack.top()->addShape(newShape);
+                // Stack rỗng -> Thêm vào danh sách gốc
+                else shapes.push_back(newShape);
+            }
         }
 
         pos = endTag + 1;
