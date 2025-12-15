@@ -13,6 +13,8 @@ Style::Style() {
 
     fillRule = "nonzero";
     strokeMiterLimit = 4.0;
+
+    transform = "";
 }
 
 /* ----- Getters ----- */
@@ -26,6 +28,8 @@ const std::string& Style::getFontFamily() const { return fontFamily; }
 
 const std::string Style::getFillRule() const { return fillRule; }
 double Style::getStrokeMiterLimit() const { return strokeMiterLimit; }
+
+const std::string Style::getTransform() const { return transform; }
 
 /* ----- Setters ----- */
 
@@ -53,5 +57,7 @@ void Style::setFontFamily(const std::string& val) { fontFamily = val; }
 
 void Style::setFillRule(const std::string& val) { fillRule = val; }
 void Style::setStrokeMiterLimit(double val) { strokeMiterLimit = val; }
+
+void Style::setTransform(const std::string& val) { transform = val; }
 
 }
