@@ -88,6 +88,10 @@ SVG::Style SVGParser::parserStyle(const string& line) const {
 
     style.setStrokeMiterLimit(getAttrDouble(line, "stroke-miterlimit", 4.0));
 
+    // Transform
+    val = getAttrString(line, " transform");
+    if (!val.empty()) { style.setTransform(val); }
+
     return style;
 }
 
@@ -172,7 +176,7 @@ void SVGParser::parserFile(const string& filename) {
             }
         }
         else if (tagName == "/linearGradient") {
-            currentGradient == nullptr;
+            currentGradient = nullptr;
         }
 
         // Xử lý các loại hình
