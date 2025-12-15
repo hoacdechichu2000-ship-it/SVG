@@ -167,7 +167,7 @@ LRESULT AppWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     InvalidateRect(m_hwnd, NULL, FALSE);
                     
                     // Tên cửa sổ
-                    SetWindowText(m_hwnd, L"SVG Viewer ([O]: Mo file khac, [E]: Phong to, [Q]: Thu nho, [LEFT]: Xoay trai, [RIGHT]: Xoay phai, [R]: Reset).");
+                    SetWindowText(m_hwnd, L"SVG Viewer ([O]: Mo file khac, [E]: Phong to, [Q]: Thu nho, [WASD]: Di chuyen, [LEFT]: Xoay trai, [RIGHT]: Xoay phai, [R]: Reset).");
                 }
                 catch (...) {
                     MessageBox(m_hwnd, L"Loi khong doc duoc file SVG!", L"Error", MB_OK | MB_ICONERROR);
@@ -193,7 +193,7 @@ LRESULT AppWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // Giới hạn zoom (nếu cần)
         if (m_viewScale < 0.1f) m_viewScale = 0.1f;
-        if (m_viewScale > 50.0f) m_viewScale = 50.0f;
+        if (m_viewScale > 100.0f) m_viewScale = 100.0f;
 
         InvalidateRect(m_hwnd, NULL, FALSE); // Vẽ lại
         return 0;
