@@ -16,16 +16,15 @@ private:
     // Lưu tất cả ID của gradient
     std::map<std::string, SVG::LinearGradient> gradients;
 
-    // Lấy các thông số string, int, double
+    // Lấy các thông số string, double
     std::string getAttrString(const std::string& line, const std::string& attr) const;
-    int getAttrInt(const std::string& line, const std::string& attr, int defaultValue) const;
     double getAttrDouble(const std::string& line, const std::string& attr, double defaultValue) const;
 
     // Lấy các thuộc tính màu sắc
     SVG::Style parserStyle(const std::string& line) const;
 
     // Lấy thuộc tính points
-    std::vector<std::pair<int,int>> getPoints(const std::string& pointsStr) const;
+    std::vector<std::pair<double, double>> getPoints(const std::string& pointsStr) const;
 
 public:
     // Constructor & Destructor
