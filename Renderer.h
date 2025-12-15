@@ -32,13 +32,13 @@ public:
 private:
     const std::map<std::string, SVG::LinearGradient>* gradientMap = nullptr;
 
-    Gdiplus::Color parseColor(const std::string& colorStr, double opacity) const;
-    Gdiplus::Pen* createPen(const SVG::Style& style) const;
-    Gdiplus::Brush* createBrush(const SVG::Style& style, const Gdiplus::RectF& bounds) const;
+    Color parseColor(const std::string& colorStr, double opacity) const;
+    Pen* createPen(const SVG::Style& style) const;
+    Brush* createBrush(const SVG::Style& style, const RectF& bounds) const;
 
-    Gdiplus::Matrix* parseTransform(const std::string& transformStr) const;
-    void applyTransform(Gdiplus::Graphics& g, const SVG::Style& style, Gdiplus::Matrix& saveState) const;
-    void restoreTransform(Gdiplus::Graphics& g, const Gdiplus::Matrix& saveState) const;
+    Matrix* parseTransform(const std::string& transformStr) const;
+    void applyTransform(Graphics& g, const SVG::Style& style, Matrix& saveState) const;
+    void restoreTransform(Graphics& g, const Matrix& saveState) const;
 
     void drawLine(Graphics& g, const SVG::Line* line) const;
     void drawRect(Graphics& g, const SVG::Rect* rect) const;
@@ -47,6 +47,8 @@ private:
     void drawPolyline(Graphics& g, const SVG::Polyline* poly) const;
     void drawPolygon(Graphics& g, const SVG::Polygon* poly) const;
     void drawText(Graphics& g, const SVG::Text* text) const;
+    void drawPath(Graphics& g, const SVG::Path* path) const;
+    void drawGroup(Graphics& g, const SVG::Group* group) const;
 };
 
 #endif // RENDERER_H
