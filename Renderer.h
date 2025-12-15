@@ -36,6 +36,10 @@ private:
     Gdiplus::Pen* createPen(const SVG::Style& style) const;
     Gdiplus::Brush* createBrush(const SVG::Style& style, const Gdiplus::RectF& bounds) const;
 
+    Gdiplus::Matrix* parseTransform(const std::string& transformStr) const;
+    void applyTransform(Gdiplus::Graphics& g, const SVG::Style& style, Gdiplus::Matrix& saveState) const;
+    void restoreTransform(Gdiplus::Graphics& g, const Gdiplus::Matrix& saveState) const;
+
     void drawLine(Graphics& g, const SVG::Line* line) const;
     void drawRect(Graphics& g, const SVG::Rect* rect) const;
     void drawCircle(Graphics& g, const SVG::Circle* circle) const;
