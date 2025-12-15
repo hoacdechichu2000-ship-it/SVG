@@ -1,8 +1,11 @@
 #include "Renderer.h"
 #include <sstream>
 #include <stdio.h> 
+#include <map>
 #include <algorithm> 
 #include <cctype>
+
+#include <iostream>
 
 using namespace std; 
 using namespace SVG;
@@ -19,22 +22,47 @@ wstring s2ws(const string& str) {
 }
 
 // Parse màu sắc
-Color Renderer::parseColor(const string& colorStr, double opacity = 1.0) const {
-    if (colorStr == "none" || colorStr.empty()) return Color(0, 0, 0, 0); 
-    if (colorStr == "black") return Color((BYTE)(opacity * 255), 0, 0, 0);
+Color Renderer::parseColor(const string& colorStr, double opacity) const {
+    // Làm sạch chuỗi
+    string input = colorStr;
+    input.erase(std::remove(input.begin(), input.end(), '\"'), input.end());
+    input.erase(std::remove(input.begin(), input.end(), '\''), input.end());
     
-    int r = 0, g = 0, b = 0; 
+    // Trim
+    size_t first = input.find_first_not_of(" \t\r\n");
+    if (string::npos == first) return Color(0, 0, 0, 0); // Chuỗi rỗng
+    size_t last = input.find_last_not_of(" \t\r\n");
+    input = input.substr(first, (last - first + 1));
 
-    if (colorStr[0] == '#') {
-        const char* hex = colorStr.c_str() + 1;
-        #ifdef _MSC_VER
-        sscanf_s(hex, "%02x%02x%02x", &r, &g, &b);
-        #else
-        sscanf(hex, "%02x%02x%02x", &r, &g, &b);
-        #endif
+    if (input == "none" || input.empty()) return Color(0, 0, 0, 0);
+
+    int r = 0, g = 0, b = 0;
+
+    // Xử lý hex
+    if (input[0] == '#') {
+        string hex = input.substr(1); // Bỏ dấu #
+        
+        // 3 số
+        if (hex.length() == 3) {
+            string temp = "";
+            temp += hex[0]; temp += hex[0];
+            temp += hex[1]; temp += hex[1];
+            temp += hex[2]; temp += hex[2];
+            hex = temp;
+        }
+
+        // 6 số
+        if (hex.length() >= 6) {
+            #ifdef _MSC_VER
+            sscanf_s(hex.c_str(), "%02x%02x%02x", &r, &g, &b);
+            #else
+            sscanf(hex.c_str(), "%02x%02x%02x", &r, &g, &b);
+            #endif
+        }
     } 
-    else if (colorStr.size() >= 4 && colorStr.substr(0, 4) == "rgb(") {
-        string temp = colorStr.substr(4); 
+    // Xử lý RGB
+    else if (input.size() >= 4 && input.substr(0, 4) == "rgb(") {
+        string temp = input.substr(4); 
         size_t end = temp.find(')');
         if (end != string::npos) temp = temp.substr(0, end); 
 
@@ -43,7 +71,192 @@ Color Renderer::parseColor(const string& colorStr, double opacity = 1.0) const {
         istringstream ss(temp);
         ss >> r >> g >> b;
     }
+    // Xử lý tên màu
+    else {
+        string lowerName = input;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 
+        // Full 147 màu chuẩn SVG/CSS3
+        static std::map<string, Color> colorMap = {
+            // --- A ---
+            {"aliceblue",            Color(240, 248, 255)},
+            {"antiquewhite",         Color(250, 235, 215)},
+            {"aqua",                 Color(0, 255, 255)},
+            {"aquamarine",           Color(127, 255, 212)},
+            {"azure",                Color(240, 255, 255)},
+            // --- B ---
+            {"beige",                Color(245, 245, 220)},
+            {"bisque",               Color(255, 228, 196)},
+            {"black",                Color(0, 0, 0)},
+            {"blanchedalmond",       Color(255, 235, 205)},
+            {"blue",                 Color(0, 0, 255)},
+            {"blueviolet",           Color(138, 43, 226)},
+            {"brown",                Color(165, 42, 42)},
+            {"burlywood",            Color(222, 184, 135)},
+            // --- C ---
+            {"cadetblue",            Color(95, 158, 160)},
+            {"chartreuse",           Color(127, 255, 0)},
+            {"chocolate",            Color(210, 105, 30)},
+            {"coral",                Color(255, 127, 80)},
+            {"cornflowerblue",       Color(100, 149, 237)},
+            {"cornsilk",             Color(255, 248, 220)},
+            {"crimson",              Color(220, 20, 60)},
+            {"cyan",                 Color(0, 255, 255)},
+            // --- D ---
+            {"darkblue",             Color(0, 0, 139)},
+            {"darkcyan",             Color(0, 139, 139)},
+            {"darkgoldenrod",        Color(184, 134, 11)},
+            {"darkgray",             Color(169, 169, 169)},
+            {"darkgrey",             Color(169, 169, 169)},
+            {"darkgreen",            Color(0, 100, 0)},
+            {"darkkhaki",            Color(189, 183, 107)},
+            {"darkmagenta",          Color(139, 0, 139)},
+            {"darkolivegreen",       Color(85, 107, 47)},
+            {"darkorange",           Color(255, 140, 0)},
+            {"darkorchid",           Color(153, 50, 204)},
+            {"darkred",              Color(139, 0, 0)},
+            {"darksalmon",           Color(233, 150, 122)},
+            {"darkseagreen",         Color(143, 188, 143)},
+            {"darkslateblue",        Color(72, 61, 139)},
+            {"darkslategray",        Color(47, 79, 79)},
+            {"darkslategrey",        Color(47, 79, 79)},
+            {"darkturquoise",        Color(0, 206, 209)},
+            {"darkviolet",           Color(148, 0, 211)},
+            {"deeppink",             Color(255, 20, 147)},
+            {"deepskyblue",          Color(0, 191, 255)},
+            {"dimgray",              Color(105, 105, 105)},
+            {"dimgrey",              Color(105, 105, 105)},
+            {"dodgerblue",           Color(30, 144, 255)},
+            // --- F ---
+            {"firebrick",            Color(178, 34, 34)},
+            {"floralwhite",          Color(255, 250, 240)},
+            {"forestgreen",          Color(34, 139, 34)},
+            {"fuchsia",              Color(255, 0, 255)},
+            // --- G ---
+            {"gainsboro",            Color(220, 220, 220)},
+            {"ghostwhite",           Color(248, 248, 255)},
+            {"gold",                 Color(255, 215, 0)},
+            {"goldenrod",            Color(218, 165, 32)},
+            {"gray",                 Color(128, 128, 128)},
+            {"grey",                 Color(128, 128, 128)},
+            {"green",                Color(0, 128, 0)},
+            {"greenyellow",          Color(173, 255, 47)},
+            // --- H ---
+            {"honeydew",             Color(240, 255, 240)},
+            {"hotpink",              Color(255, 105, 180)},
+            // --- I ---
+            {"indianred",            Color(205, 92, 92)},
+            {"indigo",               Color(75, 0, 130)},
+            {"ivory",                Color(255, 255, 240)},
+            // --- K ---
+            {"khaki",                Color(240, 230, 140)},
+            // --- L ---
+            {"lavender",             Color(230, 230, 250)},
+            {"lavenderblush",        Color(255, 240, 245)},
+            {"lawngreen",            Color(124, 252, 0)},
+            {"lemonchiffon",         Color(255, 250, 205)},
+            {"lightblue",            Color(173, 216, 230)},
+            {"lightcoral",           Color(240, 128, 128)},
+            {"lightcyan",            Color(224, 255, 255)},
+            {"lightgoldenrodyellow", Color(250, 250, 210)},
+            {"lightgray",            Color(211, 211, 211)},
+            {"lightgrey",            Color(211, 211, 211)},
+            {"lightgreen",           Color(144, 238, 144)},
+            {"lightpink",            Color(255, 182, 193)},
+            {"lightsalmon",          Color(255, 160, 122)},
+            {"lightseagreen",        Color(32, 178, 170)},
+            {"lightskyblue",         Color(135, 206, 250)},
+            {"lightslategray",       Color(119, 136, 153)},
+            {"lightslategrey",       Color(119, 136, 153)},
+            {"lightsteelblue",       Color(176, 196, 222)},
+            {"lightyellow",          Color(255, 255, 224)},
+            {"lime",                 Color(0, 255, 0)},
+            {"limegreen",            Color(50, 205, 50)},
+            {"linen",                Color(250, 240, 230)},
+            // --- M ---
+            {"magenta",              Color(255, 0, 255)},
+            {"maroon",               Color(128, 0, 0)},
+            {"mediumaquamarine",     Color(102, 205, 170)},
+            {"mediumblue",           Color(0, 0, 205)},
+            {"mediumorchid",         Color(186, 85, 211)},
+            {"mediumpurple",         Color(147, 112, 219)},
+            {"mediumseagreen",       Color(60, 179, 113)},
+            {"mediumslateblue",      Color(123, 104, 238)},
+            {"mediumspringgreen",    Color(0, 250, 154)},
+            {"mediumturquoise",      Color(72, 209, 204)},
+            {"mediumvioletred",      Color(199, 21, 133)},
+            {"midnightblue",         Color(25, 25, 112)},
+            {"mintcream",            Color(245, 255, 250)},
+            {"mistyrose",            Color(255, 228, 225)},
+            {"moccasin",             Color(255, 228, 181)},
+            // --- N ---
+            {"navajowhite",          Color(255, 222, 173)},
+            {"navy",                 Color(0, 0, 128)},
+            // --- O ---
+            {"oldlace",              Color(253, 245, 230)},
+            {"olive",                Color(128, 128, 0)},
+            {"olivedrab",            Color(107, 142, 35)},
+            {"orange",               Color(255, 165, 0)},
+            {"orangered",            Color(255, 69, 0)},
+            {"orchid",               Color(218, 112, 214)},
+            // --- P ---
+            {"palegoldenrod",        Color(238, 232, 170)},
+            {"palegreen",            Color(152, 251, 152)},
+            {"paleturquoise",        Color(175, 238, 238)},
+            {"palevioletred",        Color(219, 112, 147)},
+            {"papayawhip",           Color(255, 239, 213)},
+            {"peachpuff",            Color(255, 218, 185)},
+            {"peru",                 Color(205, 133, 63)},
+            {"pink",                 Color(255, 192, 203)},
+            {"plum",                 Color(221, 160, 221)},
+            {"powderblue",           Color(176, 224, 230)},
+            {"purple",               Color(128, 0, 128)},
+            // --- R ---
+            {"red",                  Color(255, 0, 0)},
+            {"rosybrown",            Color(188, 143, 143)},
+            {"royalblue",            Color(65, 105, 225)},
+            // --- S ---
+            {"saddlebrown",          Color(139, 69, 19)},
+            {"salmon",               Color(250, 128, 114)},
+            {"sandybrown",           Color(244, 164, 96)},
+            {"seagreen",             Color(46, 139, 87)},
+            {"seashell",             Color(255, 245, 238)},
+            {"sienna",               Color(160, 82, 45)},
+            {"silver",               Color(192, 192, 192)},
+            {"skyblue",              Color(135, 206, 235)},
+            {"slateblue",            Color(106, 90, 205)},
+            {"slategray",            Color(112, 128, 144)},
+            {"slategrey",            Color(112, 128, 144)},
+            {"snow",                 Color(255, 250, 250)},
+            {"springgreen",          Color(0, 255, 127)},
+            {"steelblue",            Color(70, 130, 180)},
+            // --- T ---
+            {"tan",                  Color(210, 180, 140)},
+            {"teal",                 Color(0, 128, 128)},
+            {"thistle",              Color(216, 191, 216)},
+            {"tomato",               Color(255, 99, 71)},
+            {"transparent",          Color(0, 0, 0, 0)}, // Màu trong suốt
+            {"turquoise",            Color(64, 224, 208)},
+            // --- V ---
+            {"violet",               Color(238, 130, 238)},
+            // --- W ---
+            {"wheat",                Color(245, 222, 179)},
+            {"white",                Color(255, 255, 255)},
+            {"whitesmoke",           Color(245, 245, 245)},
+            // --- Y ---
+            {"yellow",               Color(255, 255, 0)},
+            {"yellowgreen",          Color(154, 205, 50)}
+        };
+
+        auto it = colorMap.find(lowerName);
+        if (it != colorMap.end()) {
+            r = it->second.GetR();
+            g = it->second.GetG();
+            b = it->second.GetB();
+        }
+    }
+
+    // Clamp và trả về
     if (r < 0) r = 0; else if (r > 255) r = 255;
     if (g < 0) g = 0; else if (g > 255) g = 255;
     if (b < 0) b = 0; else if (b > 255) b = 255;
@@ -53,10 +266,10 @@ Color Renderer::parseColor(const string& colorStr, double opacity = 1.0) const {
 }
 
 // Tạo bút (Pen), dùng cho Stroke
-Gdiplus::Pen* Renderer::createPen(const SVG::Style& style) const {
+Pen* Renderer::createPen(const SVG::Style& style) const {
     if (style.getStroke() == "none" || style.getStroke().empty() || style.getStrokeWidth() <= 0) return nullptr;
 
-    Color c = parseColor(style.getStroke(), style.getStrokeOpacity());
+    Color c = parseColor(style.getStroke(), (REAL)style.getStrokeOpacity());
     Gdiplus::Pen* pen = new Gdiplus::Pen(c, (REAL)style.getStrokeWidth());
 
     pen->SetMiterLimit((REAL)style.getStrokeMiterLimit());
@@ -65,7 +278,7 @@ Gdiplus::Pen* Renderer::createPen(const SVG::Style& style) const {
 }
 
 // Tạo cọ (Brush), dùng cho Fill
-Gdiplus::Brush* Renderer::createBrush(const SVG::Style& style, const Gdiplus::RectF& bounds) const {
+Brush* Renderer::createBrush(const SVG::Style& style, const Gdiplus::RectF& bounds) const {
     string fill = style.getFill();
     if (fill == "none" || fill.empty()) return nullptr;
 
@@ -135,16 +348,16 @@ Gdiplus::Brush* Renderer::createBrush(const SVG::Style& style, const Gdiplus::Re
     }
 
     // Mặc định: Solid Brush
-    Color c = parseColor(style.getFill(), style.getFillOpacity());
+    Color c = parseColor(style.getFill(), (REAL)style.getFillOpacity());
     return new Gdiplus::SolidBrush(c);
 }
 
 // Parse transform thành Matrix
-Gdiplus::Matrix* Renderer::parseTransform(const std::string& transformStr) const {
+Matrix* Renderer::parseTransform(const std::string& transformStr) const {
     if (transformStr.empty()) return nullptr;
 
-    std::string str = transformStr;
-    std::replace(str.begin(), str.end(), ',', ' ');
+    string str = transformStr;
+    replace(str.begin(), str.end(), ',', ' ');
 
     Gdiplus::Matrix* matrix = new Gdiplus::Matrix();    // Ma trận đơn vị
 
@@ -157,17 +370,17 @@ Gdiplus::Matrix* Renderer::parseTransform(const std::string& transformStr) const
         if (closeParen == std::string::npos) break;
 
         // Lấy tên lệnh (translate, rotate, scale)
-        std::string rawCmd = str.substr(pos, openParen - pos);
-        std::string cmd = "";
+        string rawCmd = str.substr(pos, openParen - pos);
+        string cmd = "";
         for (char c : rawCmd) {
             if (std::isalpha(c)) cmd += c;
         }
 
-        std::string args = str.substr(openParen + 1, closeParen - openParen - 1);
+        string args = str.substr(openParen + 1, closeParen - openParen - 1);
 
         // Đọc thông số của lệnh
-        std::stringstream ss(args);
-        std::vector<REAL> vals;
+        stringstream ss(args);
+        vector<REAL> vals;
         REAL val;
         while (ss >> val) vals.push_back(val);
 
@@ -204,7 +417,7 @@ void Renderer::applyTransform(Graphics& g, const SVG::Style& style, Gdiplus::Mat
     g.GetTransform(&saveState);     // Lưu trạng thái cũ
 
     // Parse và áp dụng
-    std::string transform = style.getTransform();
+    string transform = style.getTransform();
     if(!transform.empty()) {
         Gdiplus::Matrix* shapeMatrix = parseTransform(transform);
         if (shapeMatrix) {
@@ -232,13 +445,17 @@ void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
 
     GraphicsState state = g.Save(); // Lưu trạng thái
     
-    if (const auto* l = dynamic_cast<const SVG::Line*>(shape))          drawLine(g, l);
+    if (const auto* group = dynamic_cast<const SVG::Group*>(shape)) {
+        drawGroup(g, group); // Gọi đệ quy
+    }
+    else if (const auto* l = dynamic_cast<const SVG::Line*>(shape))          drawLine(g, l);
     else if (const auto* r = dynamic_cast<const SVG::Rect*>(shape))     drawRect(g, r);
     else if (const auto* c = dynamic_cast<const SVG::Circle*>(shape))   drawCircle(g, c);
     else if (const auto* e = dynamic_cast<const SVG::Ellipse*>(shape))  drawEllipse(g, e);
     else if (const auto* pl = dynamic_cast<const SVG::Polyline*>(shape)) drawPolyline(g, pl);
     else if (const auto* pg = dynamic_cast<const SVG::Polygon*>(shape))  drawPolygon(g, pg);
     else if (const auto* t = dynamic_cast<const SVG::Text*>(shape))     drawText(g, t);
+    else if (const auto* p = dynamic_cast<const SVG::Path*>(shape))     drawPath(g, p);
 
     g.Restore(state); // Khôi phục trạng thái
 }
@@ -249,12 +466,13 @@ void Renderer::drawShape(Graphics& g, const SVG::Shape* shape) const {
 void Renderer::drawLine(Graphics& g, const SVG::Line* l) const {
     const Style& s = l->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
     Gdiplus::Pen* pen = createPen(l->getStyle());
     if (pen) {
-        g.DrawLine(pen, l->getX1(), l->getY1(), l->getX2(), l->getY2());
+        g.DrawLine(pen, (REAL)l->getX1(), (REAL)l->getY1(), (REAL)l->getX2(), (REAL)l->getY2());
         delete pen;
     }
 
@@ -265,6 +483,7 @@ void Renderer::drawLine(Graphics& g, const SVG::Line* l) const {
 void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
     const Style& s = r->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
@@ -273,14 +492,14 @@ void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
     // Fill
     Gdiplus::Brush* brush = createBrush(s, bounds);
     if (brush) {
-        g.FillRectangle(brush, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        g.FillRectangle(brush, (REAL)r->getX(), (REAL)r->getY(), (REAL)r->getWidth(), (REAL)r->getHeight());
         delete brush;
     }
 
     // Stroke
     Gdiplus::Pen* pen = createPen(s);
     if (pen) {
-        g.DrawRectangle(pen, r->getX(), r->getY(), r->getWidth(), r->getHeight());
+        g.DrawRectangle(pen, (REAL)r->getX(), (REAL)r->getY(), (REAL)r->getWidth(), (REAL)r->getHeight());
         delete pen;
     }
 
@@ -291,6 +510,7 @@ void Renderer::drawRect(Graphics& g, const SVG::Rect* r) const {
 void Renderer::drawCircle(Graphics& g, const SVG::Circle* c) const {
     const Style& s = c->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
@@ -320,6 +540,7 @@ void Renderer::drawCircle(Graphics& g, const SVG::Circle* c) const {
 void Renderer::drawEllipse(Graphics& g, const SVG::Ellipse* e) const {
     const Style& s = e->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
@@ -350,6 +571,7 @@ void Renderer::drawEllipse(Graphics& g, const SVG::Ellipse* e) const {
 void Renderer::drawPolyline(Graphics& g, const SVG::Polyline* pl) const {
     const Style& s = pl->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
     
@@ -394,6 +616,7 @@ void Renderer::drawPolyline(Graphics& g, const SVG::Polyline* pl) const {
 void Renderer::drawPolygon(Graphics& g, const SVG::Polygon* pg) const {
     const Style& s = pg->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
@@ -438,23 +661,66 @@ void Renderer::drawPolygon(Graphics& g, const SVG::Polygon* pg) const {
 void Renderer::drawText(Graphics& g, const SVG::Text* t) const {
     const Style& s = t->getStyle();
 
+    // Transform
     Gdiplus::Matrix oldMatrix;
     applyTransform(g, s, oldMatrix);
 
-    wstring wFontFamily = s2ws(s.getFontFamily());
+    // Xử lý font style & weight
+    INT fontStyle = FontStyleRegular;
+    // Bold: SVG có thể dùng số (700) hoặc chữ (bold)
+    if (s.getFontWeight() == "bold" || s.getFontWeight() == "bolder" || s.getFontWeight() == "700") {
+        fontStyle |= FontStyleBold;
+    }
+    // Italic
+    if (s.getFontStyle() == "italic" || s.getFontStyle() == "oblique") {
+        fontStyle |= FontStyleItalic;
+    }
+
+    // Xử lý font family
+    string fontName = s.getFontFamily();
+    if (fontName == "Time New Romand") {
+        fontName = "Times New Roman";
+    }
+    wstring wFontFamily = s2ws(fontName);
     FontFamily fontFamily(wFontFamily.c_str());
 
+    // Xử lý text anchor
+    StringFormat format;
+    string anchor = s.getTextAnchor();
+    
+    if (anchor == "middle") {
+        format.SetAlignment(StringAlignmentCenter); // Căn giữa
+    } else if (anchor == "end") {
+        format.SetAlignment(StringAlignmentFar); // Căn phải
+    } else {
+        format.SetAlignment(StringAlignmentNear); // Căn trái (mặc định)
+    }
+
+    REAL drawX = (REAL)(t->getX() + t->getDX());
+    REAL drawY = (REAL)(t->getY() + t->getDY()) - (REAL)s.getFontSize();
+
+    RectF layoutRect(drawX, drawY, 0.0f, 0.0f);
+
     wstring ws = s2ws(t->getContent());
-    PointF origin((REAL)t->getX(), (REAL)t->getY() - (REAL)t->getFontSize());
+    GraphicsPath path;
 
     // Tạo Path chữ
-    GraphicsPath path;
-    path.AddString(
+    Status status = path.AddString(
         ws.c_str(), -1, &fontFamily,
-        FontStyleRegular, (REAL)t->getFontSize(), origin, NULL
+        fontStyle, (REAL)s.getFontSize(), 
+        layoutRect, &format // Truyền format và layoutRect vào để căn lề
     );
 
-    // Bounds
+    // Lỗi font -> dùng Times New Roman mặc định
+    if (status != Ok) {
+        FontFamily fallbackFont(L"Times New Roman"); 
+        path.AddString(
+            ws.c_str(), -1, &fallbackFont,
+            fontStyle, (REAL)s.getFontSize(),
+            layoutRect, &format
+        );
+    }
+
     RectF bounds;
     path.GetBounds(&bounds);
 
@@ -473,4 +739,178 @@ void Renderer::drawText(Graphics& g, const SVG::Text* t) const {
     }
 
     restoreTransform(g, oldMatrix);
+}
+
+// Vẽ Path
+void Renderer::drawPath(Graphics& g, const SVG::Path* p) const {
+    const Style& s = p->getStyle();
+    string d = p->getData();
+    if (d.empty()) return;
+
+    replace(d.begin(), d.end(), ',', ' ');
+
+    GraphicsPath path;
+    stringstream ss(d);
+
+    char cmd = 0;           
+    char lastCmd = 0; // Cần nhớ lệnh trước đó để tính điểm phản chiếu
+
+    double curX = 0, curY = 0; 
+    double startX = 0, startY = 0; 
+    
+    // Điểm điều khiển cuối cùng của lệnh curve trước đó (dùng cho S/s)
+    double lastCtrlX = 0, lastCtrlY = 0;
+
+    double x, y, x1, y1, x2, y2, x3, y3; 
+
+    while (ss.good()) {
+        ss >> ws;
+        if (ss.eof()) break;
+
+        char nextChar = ss.peek();
+        if (isalpha(nextChar)) ss >> cmd;
+        else if (cmd == 0) break;
+
+        // Xử lý lệnh Path
+        // Quy luật: chữ hoa -> gán tọa độ, chữ thường -> cộng tọa độ
+        if (cmd == 'M' || cmd == 'm') {
+            if (ss >> x >> y) {
+                if (cmd == 'm') { x += curX; y += curY; }
+                path.StartFigure();
+                curX = x; curY = y;
+                startX = x; startY = y;
+                
+                // Reset điểm điều khiển
+                lastCtrlX = curX; lastCtrlY = curY;
+                lastCmd = cmd;
+                cmd = (cmd == 'M') ? 'L' : 'l'; 
+            }
+        }
+        else if (cmd == 'L' || cmd == 'l') {
+            if (ss >> x >> y) {
+                if (cmd == 'l') { x += curX; y += curY; }
+                path.AddLine((REAL)curX, (REAL)curY, (REAL)x, (REAL)y);
+                curX = x; curY = y;
+                lastCtrlX = curX; lastCtrlY = curY; // Line không có điểm điều khiển cong
+            }
+        }
+        else if (cmd == 'H' || cmd == 'h') {
+            if (ss >> x) {
+                if (cmd == 'h') x += curX;
+                path.AddLine((REAL)curX, (REAL)curY, (REAL)x, (REAL)curY);
+                curX = x; 
+                lastCtrlX = curX; lastCtrlY = curY;
+            }
+        }
+        else if (cmd == 'V' || cmd == 'v') {
+            if (ss >> y) {
+                if (cmd == 'v') y += curY;
+                path.AddLine((REAL)curX, (REAL)curY, (REAL)curX, (REAL)y);
+                curY = y;
+                lastCtrlX = curX; lastCtrlY = curY;
+            }
+        }
+        else if (cmd == 'C' || cmd == 'c') {
+            if (ss >> x1 >> y1 >> x2 >> y2 >> x3 >> y3) {
+                if (cmd == 'c') {
+                    x1 += curX; y1 += curY;
+                    x2 += curX; y2 += curY;
+                    x3 += curX; y3 += curY;
+                }
+                path.AddBezier((REAL)curX, (REAL)curY, (REAL)x1, (REAL)y1, (REAL)x2, (REAL)y2, (REAL)x3, (REAL)y3);
+                
+                // Lưu lại điểm điều khiển 2 để dùng cho lệnh S sau này
+                lastCtrlX = x2; 
+                lastCtrlY = y2;
+                curX = x3; curY = y3;
+            }
+        }
+
+        else if (cmd == 'S' || cmd == 's') {
+            if (ss >> x2 >> y2 >> x3 >> y3) { // S chỉ có 2 cặp điểm (c2 và end)
+                if (cmd == 's') {
+                    x2 += curX; y2 += curY;
+                    x3 += curX; y3 += curY;
+                }
+
+                // Tính điểm điều khiển 1 (reflection):
+                // Nếu lệnh trước là C, c, S, s thì phản chiếu lastCtrl qua cur. Nếu không, c1 trùng với cur.
+                double x1_ref, y1_ref;
+                if (lastCmd == 'C' || lastCmd == 'c' || lastCmd == 'S' || lastCmd == 's') {
+                    x1_ref = 2 * curX - lastCtrlX;
+                    y1_ref = 2 * curY - lastCtrlY;
+                } else {
+                    x1_ref = curX;
+                    y1_ref = curY;
+                }
+
+                path.AddBezier((REAL)curX, (REAL)curY, (REAL)x1_ref, (REAL)y1_ref, (REAL)x2, (REAL)y2, (REAL)x3, (REAL)y3);
+                
+                lastCtrlX = x2; 
+                lastCtrlY = y2;
+                curX = x3; curY = y3;
+            }
+        }
+
+        else if (cmd == 'Z' || cmd == 'z') {
+            path.CloseFigure();
+            curX = startX; curY = startY;
+            lastCtrlX = curX; lastCtrlY = curY;
+        }
+
+        // Cập nhật lệnh vừa thực hiện
+        lastCmd = cmd;
+    }
+
+    // Transform
+    Gdiplus::Matrix oldMatrix;
+    applyTransform(g, s, oldMatrix);
+    
+    RectF bounds;
+    path.GetBounds(&bounds);
+    
+    // Fill
+    Brush* brush = createBrush(s, bounds);
+    if (brush) {
+        path.SetFillMode((s.getFillRule() == "evenodd") ? FillModeAlternate : FillModeWinding);
+        g.FillPath(brush, &path);
+        delete brush;
+    }
+    
+    // Stroke
+    Pen* pen = createPen(s);
+    if (pen) {
+        g.DrawPath(pen, &path);
+        delete pen;
+    }
+
+    g.SetTransform(&oldMatrix);
+}
+
+void Renderer::drawGroup(Graphics& g, const SVG::Group* group) const {
+    Gdiplus::GraphicsState state = g.Save();
+    const SVG::Style& groupStyle = group->getStyle();
+
+    // Transform
+    Gdiplus::Matrix oldMatrix;
+    applyTransform(g, groupStyle, oldMatrix);
+
+    // Đệ quy
+    const std::vector<SVG::Shape*>& children = group->getChildren();
+    for (SVG::Shape* child : children) {
+        
+        SVG::Style tempStyle = child->getStyle(); 
+        tempStyle.inheritFrom(groupStyle);
+
+        SVG::Shape* mutableChild = const_cast<SVG::Shape*>(child);
+        SVG::Style originalStyle = mutableChild->getStyle(); 
+
+        mutableChild->setStyle(tempStyle); 
+        
+        drawShape(g, child); 
+
+        mutableChild->setStyle(originalStyle); 
+    }
+
+    g.Restore(state);
 }
