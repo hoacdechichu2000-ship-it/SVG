@@ -6,14 +6,22 @@
 namespace SVG {
 
 class Style {
-private:
+private:    // Các thuộc tính có thể kế thừa được (sử dụng cho thẻ <g>)
+
+    // Các thuộc tính fill & stroke
     std::string fill, stroke;
     double strokeWidth, fillOpacity, strokeOpacity;
-    std::string fontFamily;
-
     std::string fillRule;
     double strokeMiterLimit;
+    
+    // Các thuộc tính của Text
+    double fontSize;
+    std::string fontFamily;
+    std::string fontWeight;
+    std::string fontStyle;
+    std::string textAnchor;
 
+    // Thuộc tính transform
     std::string transform;
 
 public:
@@ -27,12 +35,16 @@ public:
     double getStrokeWidth() const;
     double getFillOpacity() const;
     double getStrokeOpacity() const;
-    const std::string& getFontFamily() const;
-
-    const std::string getFillRule() const;
+    const std::string& getFillRule() const;
     double getStrokeMiterLimit() const;
 
-    const std::string getTransform() const;
+    double getFontSize() const;
+    const std::string& getFontFamily() const;
+    const std::string& getFontWeight() const;
+    const std::string& getFontStyle() const;
+    const std::string& getTextAnchor() const;
+    
+    const std::string& getTransform() const;
 
     /* ----- Setters ----- */
 
@@ -41,12 +53,19 @@ public:
     void setStrokeWidth(double val);
     void setFillOpacity(double val);
     void setStrokeOpacity(double val);
-    void setFontFamily(const std::string& val);
-
     void setFillRule(const std::string& val);
     void setStrokeMiterLimit(double val);
 
+    void setFontSize(double val);
+    void setFontFamily(const std::string& val);
+    void setFontWeight(const std::string& val);
+    void setFontStyle(const std::string& val);
+    void setTextAnchor(const std::string& val);
+
     void setTransform(const std::string& val);
+
+    // Hàm kế thừa style cha
+    void inheritFrom(const Style& parent);
 };
 
 }
