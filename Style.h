@@ -14,6 +14,8 @@ private:
     std::string fillRule;
     double strokeMiterLimit;
 
+    std::string transform;
+
 public:
     // Constructor
     Style();
@@ -30,6 +32,8 @@ public:
     const std::string getFillRule() const;
     double getStrokeMiterLimit() const;
 
+    const std::string getTransform() const;
+
     /* ----- Setters ----- */
 
     void setFill(const std::string& val);
@@ -41,6 +45,8 @@ public:
 
     void setFillRule(const std::string& val);
     void setStrokeMiterLimit(double val);
+
+    void setTransform(const std::string& val);
 };
 
 }
